@@ -87,6 +87,27 @@ export function findSessionById(roots: readonly string[], id: string): string | 
   return null;
 }
 
+export interface SessionEntry {
+  readonly path: string;
+  readonly cwd: string | null;
+  readonly mtimeMs: number;
+}
+
+/** 置き場所にある会話を、作業ディレクトリを問わず新しい順に返す */
+export function recentSessions(
+  roots: readonly string[] = defaultRoots(),
+  limit = 20,
+): SessionEntry[] {
+  const found = roots.flatMap((root) => jsonlUnder(root));
+  found.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return found
+    .slice(0, limit)
+    .map((entry) => ({ path: entry.path, cwd: cwdOf(entry.path), mtimeMs: entry.mtimeMs }));
+}
+
+/** ファイルの先頭を返す（一覧に出す要約を作るため） */
+export const headOf = (path: string): string => readHead(path, DEEP_BYTES);
+
 /** その作業ディレクトリの会話を、ハーネスをまたいで新しい順に並べて返す */
 export function sessionsFor(cwd: string, roots: readonly string[] = defaultRoots()): string[] {
   const candidates = roots.flatMap((root) => jsonlUnder(root));
