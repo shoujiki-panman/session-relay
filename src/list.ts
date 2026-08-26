@@ -45,6 +45,18 @@ export interface Listed {
 }
 
 const HOME_PREFIX = /^\/Users\/[^/]+/;
+/** Codexのファイル名は `rollout-<ISO時刻>-<uuid>.jsonl`。idは末尾のuuid（実測） */
+const CODEX_NAME = /^rollout-.*?-([0-9a-f]{8})/;
+
+/**
+ * 一覧から選ぶための短い名前。
+ * Claude Codeは `<id>.jsonl` なので先頭8文字でよいが、
+ * Codexは全部 `rollout-` で始まるので、それだと**全部同じrefになって選べない**（実測）。
+ */
+function refOf(path: string): string {
+  const name = basename(path).replace(".jsonl", "");
+  return CODEX_NAME.exec(name)?.[1] ?? name.slice(0, 8);
+}
 
 /** 場所は「どのプロジェクトか」が分かればいい。ホームは ~ に畳む */
 function placeOf(cwd: string | null): string {
@@ -72,7 +84,7 @@ export function describe(entry: SessionEntry): Listed {
   const human = record === null ? [] : humanUtterances(record);
   return {
     path: entry.path,
-    ref: basename(entry.path).replace(".jsonl", "").slice(0, 8),
+    ref: refOf(entry.path),
     cwd: entry.cwd,
     place: placeOf(entry.cwd),
     harness: record?.harness === "codex" ? "codex" : "claude",

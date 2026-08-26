@@ -94,3 +94,19 @@ describeSuite("renderTable: 見て選べる形にする", () => {
     expect(renderTable([])).toContain("#");
   });
 });
+
+describeSuite("ref: Codexの記録も見分けられる名前にする", () => {
+  it("正常系: Claudeは <id>.jsonl の先頭8文字", () => {
+    expect(describe(write("abcdef1234-5678.jsonl", typedSession("/w/p", ["あ"]))).ref).toBe("abcdef12");
+  });
+  it("正常系: Codexは rollout- ではなく末尾のuuidから作る（全部同じrefになるのを防ぐ）", () => {
+    const body = row({ timestamp: "2026-08-27T00:00:00Z", payload: { type: "user_message", message: "あ" } });
+    expect(describe(write("rollout-2026-08-26T00-19-28-01a03981-44be-71d3.jsonl", body)).ref).toBe("01a03981");
+  });
+  it("Corner: 2本のCodexの記録が別々のrefになる", () => {
+    const body = row({ timestamp: "2026-08-27T00:00:00Z", payload: { type: "user_message", message: "あ" } });
+    const a = describe(write("rollout-2026-08-26T00-19-28-aaaaaaaa-1111-2222.jsonl", body)).ref;
+    const b = describe(write("rollout-2026-08-26T01-19-28-bbbbbbbb-3333-4444.jsonl", body)).ref;
+    expect(a).not.toBe(b);
+  });
+});
