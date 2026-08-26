@@ -1,6 +1,7 @@
 /**
  * 会話を別スレッド／別ハーネスへ渡す。
- *   relay --list [件数] [--all]         会話を一覧で見る（既定はいまいる場所だけ）
+ *   relay --pick [検索語] [--all]       その場で選ぶ（↑↓・打つと絞る・Enter・Esc）
+ *   relay --list [件数] [--all]         一覧を出すだけ（スキルや貼り付け用）
  *   relay [--to claude|codex] [--print] [--previous] [--from <#|ref>]
  *       いまの会話を新しいセッションで開く。
  *       --previous を付けると「自分ではなく直前の会話」を引く
@@ -11,6 +12,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { buildContext, buildContextFrom } from "./context.ts";
 import { describe, pick, renderTable } from "./list.ts";
+import { pickInteractively } from "./run-picker.ts";
 import { extractSession, humanUtterances } from "./extract.ts";
 import { readRepoSignals } from "./repo.ts";
 import { currentSessionFor, previousSessionsFor, recentSessions } from "./sessions.ts";
@@ -83,6 +85,30 @@ function list(limit: number, all: boolean): number {
   return 0;
 }
 
+/**
+ * その場で選ばせる。`codex resume` / `claude -r` と同じ作法:
+ * 1コマンドで選び終わり、打てば絞り込め、Escで取り消せる。
+ */
+async function pickedContext(query: string, all: boolean, cwd: string): Promise<string | null> {
+  if (!process.stdin.isTTY) {
+    // パイプ越し・スキル経由では画面を出せない。黙って終わらず、代わりの手を示す
+    process.stderr.write(
+      "画面を出せない場所から呼ばれました（--pick は手で選ぶためのものです）。\n" +
+        "代わりに relay --list で一覧を出し、relay --from <#かref> で選んでください\n",
+    );
+    return null;
+  }
+  const rows = humanSessions(40, all ? null : cwd);
+  if (rows.length === 0) {
+    process.stderr.write("選べる会話がありません（--all で他の場所も見られます）\n");
+    return null;
+  }
+  const chosen = await pickInteractively(rows, query);
+  if (chosen === null) return null;
+  process.stderr.write(`選んだ会話: ${chosen.place} / ${chosen.topic}\n`);
+  return buildContext(chosen.path, readRepoSignals(chosen.cwd ?? cwd));
+}
+
 /** 一覧から選んだ1本を渡す。ディレクトリが違っても引ける */
 function chosenContext(key: string, cwd: string): string | null {
   const chosen = pick(humanSessions(40, null), key);
@@ -92,12 +118,34 @@ function chosenContext(key: string, cwd: string): string | null {
   return buildContext(chosen.path, readRepoSignals(chosen.cwd ?? cwd));
 }
 
-function relay(target: string, printOnly: boolean, usePrevious: boolean, from: string | null): number {
+interface Picking {
+  readonly on: boolean;
+  readonly query: string;
+  readonly all: boolean;
+}
+
+async function chooseContext(
+  usePrevious: boolean,
+  from: string | null,
+  picking: Picking,
+  cwd: string,
+): Promise<string | null> {
+  if (picking.on) return pickedContext(picking.query, picking.all, cwd);
+  if (from !== null) return chosenContext(from, cwd);
+  return usePrevious ? previousContext(cwd) : currentContext(cwd);
+}
+
+async function relay(
+  target: string,
+  printOnly: boolean,
+  usePrevious: boolean,
+  from: string | null,
+  picking: Picking,
+): Promise<number> {
   const cwd = process.cwd();
-  const context =
-    from !== null ? chosenContext(from, cwd) : usePrevious ? previousContext(cwd) : currentContext(cwd);
+  const context = await chooseContext(usePrevious, from, picking, cwd);
   if (context === null) {
-    process.stderr.write(chooseMessage(usePrevious, from));
+    if (!picking.on) process.stderr.write(chooseMessage(usePrevious, from));
     return 1;
   }
   if (printOnly) {
@@ -130,11 +178,24 @@ if (command === "relay") {
     const asked = Number(args[listIndex + 1]);
     process.exitCode = list(Number.isInteger(asked) && asked > 0 ? asked : 15, args.includes("--all"));
   } else {
-    process.exitCode = relay(target, args.includes("--print"), args.includes("--previous"), from);
+    const pickIndex = args.indexOf("--pick");
+    const rawQuery = pickIndex >= 0 ? (args[pickIndex + 1] ?? "") : "";
+    const picking = {
+      on: pickIndex >= 0,
+      query: rawQuery.startsWith("--") ? "" : rawQuery,
+      all: args.includes("--all"),
+    };
+    process.exitCode = await relay(
+      target,
+      args.includes("--print"),
+      args.includes("--previous"),
+      from,
+      picking,
+    );
   }
 } else if (command === "show" && args[1] !== undefined) {
   process.exitCode = show(args[1]);
 } else {
-  process.stderr.write("使い方: relay --list [件数] [--all] / relay [--to claude|codex] [--print] [--previous] [--from <#|ref>] / relay show <path>\n");
+  process.stderr.write("使い方: relay --pick [検索語] [--all] / relay --list [件数] [--all] / relay [--to claude|codex] [--print] [--previous] [--from <#|ref>] / relay show <path>\n");
   process.exitCode = 2;
 }
