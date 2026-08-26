@@ -62,6 +62,19 @@ relay show ~/.codex/sessions/.../rollout-....jsonl
 
 どちらも**手元のファイルを読むだけ**で、どこにも送らない。
 
+### 「続きから」の一言で発動させる
+
+同梱のスキルを置くと、新しいセッションに **「続きから」** と打つだけで済む。
+セッション自身が `relay --print --previous` を実行して前の会話を読み込む。
+
+```sh
+ln -s "$PWD/skills/relay" ~/.claude/skills/relay   # Claude Code
+ln -s "$PWD/skills/relay" ~/.codex/skills/relay    # Codex（同じ形式で効く）
+```
+
+スマホから母艦のセッションに入る場合（Claude Codeの Remote Control）も、これで1手になる。
+コピペもファイルの受け渡しも要らない。
+
 ## いまの限界（分かっていて残していること）
 
 - gitの欄は **relay を打ったディレクトリ**のリポジトリを映す。会話の話題と別のリポジトリのことがある（`場所:` を明記して区別できるようにしてある）
