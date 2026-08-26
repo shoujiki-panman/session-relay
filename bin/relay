@@ -1,0 +1,13 @@
+#!/bin/sh
+# 会話を別スレッド／別ハーネスへ渡す
+#   relay                     いまの会話を新しいClaudeセッションで開く
+#   relay --to codex          Codexで開く
+#   relay --print             文脈だけ表示する（貼りたいとき）
+#   relay --print --previous  自分ではなく「直前の会話」を引く
+#   relay show <session.jsonl> 射影の中身を確かめる
+dir=$(dirname "$(readlink "$0" || echo "$0")")
+cli="$dir/../src/cli.ts"
+case "$1" in
+  show) exec node --experimental-strip-types "$cli" "$@" ;;
+  *)    exec node --experimental-strip-types "$cli" relay "$@" ;;
+esac

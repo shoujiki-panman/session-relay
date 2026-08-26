@@ -1,0 +1,8 @@
+node_modules/
+*.log
+# セッション記録・インデックスは絶対にコミットしない（鍵や個人情報を含む）
+*.jsonl
+*.db
+*.sqlite*
+.env
+.env.*
