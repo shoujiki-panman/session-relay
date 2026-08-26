@@ -32,31 +32,31 @@ const names = (paths: readonly string[]): string[] =>
 describe("previousSessionsFor: 自分を除いた直前の会話", () => {
   it("正常系: 自分のIDが分かれば、自分を外して新しい順に返す", () => {
     const root = fakeRoot({ mine: [0, ["いま始まった"]], prev: [10_000, ["前の話"]], old: [90_000, ["もっと前"]] });
-    const got = previousSessionsFor("/w", { CLAUDE_CODE_SESSION_ID: "mine" }, root);
+    const got = previousSessionsFor("/w", { CLAUDE_CODE_SESSION_ID: "mine" }, [root]);
     expect(names(got)).toEqual(["prev", "old"]);
   });
   it("正常系: IDが無くてもClaude Codeの中からなら、一番新しい（＝自分）を外す", () => {
     const root = fakeRoot({ mine: [0, ["いま始まった"]], prev: [10_000, ["前の話"]] });
-    expect(names(previousSessionsFor("/w", { CLAUDECODE: "1" }, root))).toEqual(["prev"]);
+    expect(names(previousSessionsFor("/w", { CLAUDECODE: "1" }, [root]))).toEqual(["prev"]);
   });
   it("Corner: Claude Codeの外（ただのシェル）からなら、一番新しいものも候補に残す", () => {
     const root = fakeRoot({ newest: [0, ["いちばん新しい"]], prev: [10_000, ["前の話"]] });
-    expect(names(previousSessionsFor("/w", {}, root))).toEqual(["newest", "prev"]);
+    expect(names(previousSessionsFor("/w", {}, [root]))).toEqual(["newest", "prev"]);
   });
   it("Edge: 自分しかいなければ空（＝前の会話は無い）", () => {
     const root = fakeRoot({ mine: [0, ["いま始まった"]] });
-    expect(previousSessionsFor("/w", { CLAUDE_CODE_SESSION_ID: "mine" }, root)).toEqual([]);
+    expect(previousSessionsFor("/w", { CLAUDE_CODE_SESSION_ID: "mine" }, [root])).toEqual([]);
   });
   it("Edge: 記録が1つも無くても落ちない", () => {
-    expect(previousSessionsFor("/w", {}, mkdtempSync(join(tmpdir(), "empty-")))).toEqual([]);
+    expect(previousSessionsFor("/w", {}, [mkdtempSync(join(tmpdir(), "empty-"))])).toEqual([]);
   });
   it("Corner: 作業ディレクトリが違う会話は混ざらない", () => {
     const root = fakeRoot({ prev: [0, ["前の話"]] });
-    expect(previousSessionsFor("/別の場所", {}, root)).toEqual([]);
+    expect(previousSessionsFor("/別の場所", {}, [root])).toEqual([]);
   });
   it("正常系: sessionsFor は自分も含めて新しい順に返す", () => {
     const root = fakeRoot({ mine: [0, ["a"]], prev: [10_000, ["b"]] });
-    expect(names(sessionsFor("/w", root))).toEqual(["mine", "prev"]);
+    expect(names(sessionsFor("/w", [root]))).toEqual(["mine", "prev"]);
   });
 });
 

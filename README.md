@@ -53,12 +53,12 @@ npm install
 ln -s "$PWD/bin/relay" ~/.local/bin/relay
 ```
 
-`relay` が自動で探すのは **Claude Codeの記録**（`~/.claude/projects/**/*.jsonl`）だけ。
-Codexの記録（`~/.codex/sessions/**/*.jsonl`）も**読める**が、いまはパスを渡す:
+`~/.claude/projects/**/*.jsonl`（Claude Code）と
+`~/.codex/sessions/YYYY/MM/DD/*.jsonl`（Codex）の**両方を自動で見つける**。
+同じ作業ディレクトリの会話が新しい順に並ぶので、`--previous` は
+**別のハーネスで話していた直前の会話**も引ける。
 
-```sh
-relay show ~/.codex/sessions/.../rollout-....jsonl
-```
+中身を確かめたいときは `relay show <path>`。
 
 どちらも**手元のファイルを読むだけ**で、どこにも送らない。
 
@@ -92,7 +92,6 @@ ln -s "$PWD/skills/relay" ~/.codex/skills/relay    # Codex（同じ形式で効�
 - [x] **Phase 2** 結果の信号（ターンの最後・git）。渡された先が進捗を過小評価しないように
 - [x] **Phase 3の入口** `relay` コマンド／ヘッダーボタン／`relay` スキル（「続きから」の1手）
 - [ ] **Phase 3** 新セッション起動時に、宙に浮いた会話へ**自動で気づく**導線
-- [ ] Codexの記録も `relay` が自動で見つける（いまは `show` にパスを渡す）
 - [ ] 索引（複数の会話から探して引く）
 
 ## 開発の決まりごと

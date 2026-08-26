@@ -140,19 +140,19 @@ describe("いましゃべっている会話を取り違えないこと（実測�
 
   it("正常系: セッションIDが渡っていれば、更新が新しい別の会話に取り違えない", () => {
     const root = fakeRoot({ "mine.jsonl": 60_000, "other.jsonl": 0 });
-    const path = currentSessionFor("/w", { CLAUDE_CODE_SESSION_ID: "mine" }, root);
+    const path = currentSessionFor("/w", { CLAUDE_CODE_SESSION_ID: "mine" }, [root]);
     expect(path).toContain("mine.jsonl");
   });
   it("Edge: IDが無ければ従来どおり一番新しいものを使う", () => {
     const root = fakeRoot({ "mine.jsonl": 60_000, "other.jsonl": 0 });
-    expect(currentSessionFor("/w", {}, root)).toContain("other.jsonl");
+    expect(currentSessionFor("/w", {}, [root])).toContain("other.jsonl");
   });
   it("Error: IDに対応する記録が無ければ、更新時刻の方に落とす", () => {
     const root = fakeRoot({ "other.jsonl": 0 });
-    expect(currentSessionFor("/w", { CLAUDE_CODE_SESSION_ID: "いない" }, root)).toContain("other.jsonl");
+    expect(currentSessionFor("/w", { CLAUDE_CODE_SESSION_ID: "いない" }, [root])).toContain("other.jsonl");
   });
   it("Corner: 作業ディレクトリが違う記録は選ばない", () => {
     const root = fakeRoot({ "other.jsonl": 0 });
-    expect(currentSessionFor("/別の場所", {}, root)).toBeNull();
+    expect(currentSessionFor("/別の場所", {}, [root])).toBeNull();
   });
 });
