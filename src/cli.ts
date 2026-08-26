@@ -1,6 +1,6 @@
 /**
  * 会話を別スレッド／別ハーネスへ渡す。
- *   relay --list [件数]                 どのプロジェクトの会話でも一覧で見る
+ *   relay --list [件数] [--all]         会話を一覧で見る（既定はいまいる場所だけ）
  *   relay [--to claude|codex] [--print] [--previous] [--from <#|ref>]
  *       いまの会話を新しいセッションで開く。
  *       --previous を付けると「自分ではなく直前の会話」を引く
@@ -51,28 +51,41 @@ function currentContext(cwd: string): string | null {
 }
 
 /** 一覧を出す。ディレクトリを問わず、新しい順 */
-function humanSessions(limit: number): ReturnType<typeof describe>[] {
+function humanSessions(limit: number, onlyCwd: string | null): ReturnType<typeof describe>[] {
   // 下請けの記録が混ざるので、多めに拾ってから人が打った会話だけ残す
-  return recentSessions(undefined, limit * 8)
+  return recentSessions(undefined, limit * 8, onlyCwd)
     .map(describe)
     .filter((row) => row.typed)
     .slice(0, limit);
 }
 
-function list(limit: number): number {
-  const listed = humanSessions(limit);
+/**
+ * 一覧を出す。既定は**いまいる場所だけ**（Codexの `codex resume` と同じ既定）。
+ * 他のプロジェクトも見たいときは --all。
+ */
+function list(limit: number, all: boolean): number {
+  const cwd = process.cwd();
+  const listed = humanSessions(limit, all ? null : cwd);
   if (listed.length === 0) {
-    process.stderr.write("会話の記録が見つかりませんでした\n");
+    process.stderr.write(
+      all
+        ? "会話の記録が見つかりませんでした\n"
+        : `この場所（${cwd}）の会話が見つかりませんでした。他の場所も見るなら relay --list --all\n`,
+    );
     return 1;
   }
   process.stdout.write(renderTable(listed));
-  process.stdout.write("選ぶには: relay --from <#かref>（--print を足すと中身だけ出る）\n");
+  process.stdout.write(
+    all
+      ? "選ぶには: relay --from <#かref>（--print を足すと中身だけ出る）\n"
+      : "選ぶには: relay --from <#かref>／他の場所も見るなら --all\n",
+  );
   return 0;
 }
 
 /** 一覧から選んだ1本を渡す。ディレクトリが違っても引ける */
 function chosenContext(key: string, cwd: string): string | null {
-  const chosen = pick(humanSessions(40), key);
+  const chosen = pick(humanSessions(40, null), key);
   if (chosen === null) return null;
   process.stderr.write(`選んだ会話: ${chosen.place} / ${chosen.topic}\n`);
   // gitは「選んだ会話が動いていた場所」を見る。いまいる場所ではない
@@ -115,13 +128,13 @@ if (command === "relay") {
   if (args.includes("--list")) {
     const listIndex = args.indexOf("--list");
     const asked = Number(args[listIndex + 1]);
-    process.exitCode = list(Number.isInteger(asked) && asked > 0 ? asked : 15);
+    process.exitCode = list(Number.isInteger(asked) && asked > 0 ? asked : 15, args.includes("--all"));
   } else {
     process.exitCode = relay(target, args.includes("--print"), args.includes("--previous"), from);
   }
 } else if (command === "show" && args[1] !== undefined) {
   process.exitCode = show(args[1]);
 } else {
-  process.stderr.write("使い方: relay --list [件数] / relay [--to claude|codex] [--print] [--previous] [--from <#|ref>] / relay show <path>\n");
+  process.stderr.write("使い方: relay --list [件数] [--all] / relay [--to claude|codex] [--print] [--previous] [--from <#|ref>] / relay show <path>\n");
   process.exitCode = 2;
 }

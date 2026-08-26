@@ -97,12 +97,18 @@ export interface SessionEntry {
 export function recentSessions(
   roots: readonly string[] = defaultRoots(),
   limit = 20,
+  onlyCwd: string | null = null,
 ): SessionEntry[] {
   const found = roots.flatMap((root) => jsonlUnder(root));
   found.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  return found
-    .slice(0, limit)
-    .map((entry) => ({ path: entry.path, cwd: cwdOf(entry.path), mtimeMs: entry.mtimeMs }));
+  const entries: SessionEntry[] = [];
+  for (const entry of found) {
+    if (entries.length >= limit) break;
+    const cwd = cwdOf(entry.path);
+    if (onlyCwd !== null && cwd !== onlyCwd) continue;
+    entries.push({ path: entry.path, cwd, mtimeMs: entry.mtimeMs });
+  }
+  return entries;
 }
 
 /** ファイルの先頭を返す（一覧に出す要約を作るため） */
