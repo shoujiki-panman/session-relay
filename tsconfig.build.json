@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": false,
+    "sourceMap": true,
+    // 自分のコードは `./foo.ts` で書いてある。出すときに `./foo.js` へ書き換える
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["src"]
+}

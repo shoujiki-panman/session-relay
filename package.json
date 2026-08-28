@@ -1,14 +1,15 @@
 {
-  "name": "session-relay",
+  "name": "@shoujiki-panman/session-relay",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "引き継ぎ書を書かずに、AIコーディングのセッションを別ハーネスへ持ち運ぶ",
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "lint": "eslint src test",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run test"
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "prepublishOnly": "npm run check && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -21,5 +22,31 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "zod": "^4.4.3"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shoujiki-panman/session-relay.git"
+  },
+  "keywords": [
+    "mcp",
+    "claude-code",
+    "codex",
+    "handoff",
+    "session",
+    "context"
+  ],
+  "bin": {
+    "relay": "bin/relay.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
   }
 }

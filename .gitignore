@@ -8,3 +8,5 @@ node_modules/
 .env.*
 # 書き出したキャンバス（中身は会話の見出し＝個人的な内容）
 *.canvas
+dist/
+*.tgz
