@@ -12,10 +12,23 @@ relay --print --previous 自分ではなく「直前の会話」を引く
 
 relay --pick             その場で選ぶ（↑↓ / 打つと絞る / Enter / Esc）
 relay --pick mulmo       検索語つきで開く
-relay --list             一覧を出すだけ（貼り付け・スキル用）
+relay --projects         プロジェクト単位の一覧（選ぶ単位はこちら）
+relay --list --in mulmo  そのプロジェクトの会話まで降りる
+relay --list             いまいる場所の会話の一覧
 relay --list --all       他のプロジェクトの会話も見る
-relay --from 3           一覧の3番の会話を引く（別のプロジェクトでもいい）
+relay --from 3           一覧の3番の会話を引く
+relay --from c44a44e9    refで引く（番号と違い、どれだけ古くても当たる）
+relay --canvas           プロジェクトと会話を .canvas に書き出す
 ```
+
+**選ぶ単位は会話ではなくプロジェクト。** 会話を単位にすると、選ぶときに出るのが
+「会話の切れ端」になり、どのプロジェクトの話か分からない。
+`AGENTS.md` や Memory Bank が跨ぐ単位をプロジェクトにしているのと同じ理由。
+
+`--canvas` は [JSON Canvas](https://jsoncanvas.org/)（Obsidian のキャンバス形式・MIT）を書き出す。
+**こちらは画面を作らない。** `.canvas` を Obsidian の Vault に置けば、そのまま
+無限キャンバスとして開き、ドラッグも矢印も既にある機能で触れる。
+会話のカードには `relay --from <ref>` が書いてあるので、そこから続きに入れる。
 
 **「続きから」だけでは、どの会話かは決まらない。** 同じ場所で複数の会話が
 並行して動いていることがあるので、当てにいかず選ばせる。
