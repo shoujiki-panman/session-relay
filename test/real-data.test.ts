@@ -20,10 +20,21 @@ function findJsonl(root: string, depth = 3): string[] {
   return out;
 }
 
-const biggest = (paths: string[]): string | null =>
-  paths.length === 0
+/**
+ * 実データで試すのに使うファイルの上限。
+ * 「一番大きいもの」をそのまま選ぶと、手元で **380MB** の記録を掴んで
+ * 読み込みだけで5秒の制限を超えた（2026-08-28 実測。この変更とは無関係に赤かった）。
+ * 取りこぼしの回帰を見るのに巨大さは要らない。上限内で一番大きいものを使う。
+ */
+const MAX_BYTES = 64 * 1024 * 1024;
+
+const biggest = (paths: string[]): string | null => {
+  const withinCap = paths.filter((path) => statSync(path).size <= MAX_BYTES);
+  const usable = withinCap.length === 0 ? paths : withinCap;
+  return usable.length === 0
     ? null
-    : paths.reduce((a, b) => (statSync(a).size >= statSync(b).size ? a : b));
+    : usable.reduce((a, b) => (statSync(a).size >= statSync(b).size ? a : b));
+};
 
 const claudeFiles = findJsonl(join(homedir(), ".claude", "projects"), 1);
 const codexFiles = findJsonl(join(homedir(), ".codex", "sessions"), 4);
