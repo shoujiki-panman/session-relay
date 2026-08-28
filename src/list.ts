@@ -64,12 +64,91 @@ function placeOf(cwd: string | null): string {
   return basename(cwd) === "" ? cwd.replace(HOME_PREFIX, "~") : basename(cwd);
 }
 
-/** 会話の見出し。最初の発話が一番「何の話か」を表す */
+/**
+ * ドロップされたファイル。
+ * MulmoTerminalに画像を落とすと、絶対パスがそのまま発話として記録される（実測）。
+ * 引用符つきのパスは**名前に空白が入る**ので `\S+` では届かない
+ * （実測: `'/Users/me/Desktop/スクリーンショット 2026-08-25 23.30.34.png'`）。
+ */
+const QUOTED_PATH = /['"][~/][^'"\n]*['"]/g;
+const BARE_PATH = /\S*\/\S+\.(?:png|jpe?g|gif|webp|heic|pdf|mov|mp4)\b/gi;
+/** 画像の後ろにハーネスが足す説明。人の言葉ではない */
+const IMAGE_NOTE = /\[Image:[^\]]*\]/g;
+/**
+ * ハーネスが差し込むタグ。中身は残して囲いだけ落とす。
+ * 実測: 予約実行の会話が `<scheduled-task name="weekly-report-draft" f…` で埋まり、
+ * 何の話かが見えなかった。囲いを外せば `weekly-report-draft` が見出しになる。
+ */
+const WRAP_TAG = /<\/?[A-Za-z][\w-]*(?:\s[^>]*)?>/g;
+/**
+ * URLはホスト名まで畳む。
+ * 記事のURLは1本で見出しを食い潰すが、ホスト名だけ残れば何の話かは伝わる。
+ * 日本語はURLの一部ではないので、ASCIIのURL文字で止める
+ * （`\S*` にすると「…/2-0これ入れようかな」の後半まで飲み込む）。
+ */
+const URL_ANY = /https?:\/\/([A-Za-z0-9.-]+)[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]*/g;
+
+/** 一時ファイルの名前（uuid）。名前自体が何も語らないので落とす */
+const TEMP_NAME = /^[0-9a-f]{8}-[0-9a-f]{4}/i;
+
+/**
+ * パスは**ファイル名だけ**残す。
+ * 丸ごと落とすと、スクショを1枚落としただけの会話が全部「(発話なし)」になって
+ * また見分けがつかなくなる。`スクリーンショット 2026-08-24 21.52.32` なら区別できる。
+ */
+function stemOf(path: string): string {
+  const name = path.replaceAll(/['"]/g, "").split("/").pop() ?? "";
+  const stem = name.replace(/\.[A-Za-z0-9]+$/, "");
+  return TEMP_NAME.test(stem) ? " " : ` ${stem} `;
+}
+
+/** 発話から「見出しにならないもの」を落として1行にする */
+function gist(text: string, onPath: (path: string) => string): string {
+  const cleaned = text
+    .replaceAll(QUOTED_PATH, onPath)
+    .replaceAll(BARE_PATH, onPath)
+    .replaceAll(IMAGE_NOTE, " ")
+    .replaceAll(WRAP_TAG, " ")
+    // ホスト名の後ろに区切りを入れる。入れないと「raycast.comこれ入れようかな」と詰まる
+    .replaceAll(URL_ANY, (_all, host: string) => `${host.replace(/^www\./, "")} `);
+  // 1行目だけ見ると空のことがある（改行で始まる発話。実測で「(発話なし)」になった）
+  const lines = cleaned.split("\n").map((line) => line.replaceAll(/\s+/g, " ").trim());
+  return lines.find((line) => line !== "") ?? "";
+}
+
+/** 相槌だけの発話。これが見出しになると、どの会話か分からない */
+const FILLER = new Set([
+  "続き", "つづき", "続きから", "つづきから", "はい", "いいえ",
+  "yes", "no", "ok", "やって", "うん", "そう", "お願い", "おねがい",
+]);
+/** ホスト名だけ残った発話（＝URLを貼っただけ）も、それ自体は何の話か言っていない */
+const HOST_ONLY = /^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+
+/** 見出しとして意味を持つか */
+const meaty = (text: string): boolean =>
+  text.length >= 6 && !FILLER.has(text) && !HOST_ONLY.test(text);
+
+const clean = (text: string): string => gist(text, () => " ");
+const withNames = (text: string): string => gist(text, stemOf);
+const alive = (list: readonly string[]): string[] => list.filter((text) => text !== "");
+
+/**
+ * 会話の見出し。
+ *
+ * 以前は「最初の発話が一番『何の話か』を表す」としていた。実データで崩れた
+ * （2026-08-27 実測: 一覧15本のうち6本は最初の発話がスクショの絶対パスだけで、
+ * 4行が見分けのつかない同じ見た目になった。本人の言葉:「これだとわからんな」）。
+ *
+ * パス・画像の説明・URLを落として、**中身のある最初の発話**を見出しにする。
+ * ファイル名は「他に何も残らなかったとき」だけ使う。先に混ぜると
+ * `スクリーンショット 2026-08-25 23.30.34` が44文字の枠を食って本文を押し出す（実測）。
+ */
 function topicOf(utterances: readonly string[]): string {
-  const first = utterances[0];
-  if (first === undefined) return "(発話なし)";
-  const oneLine = first.split("\n")[0] ?? "";
-  return oneLine.length > 44 ? `${oneLine.slice(0, 44)}…` : oneLine;
+  const bare = alive(utterances.map(clean));
+  const named = alive(utterances.map(withNames));
+  const shown = bare.find(meaty) ?? named.find(meaty) ?? bare[0] ?? named[0];
+  if (shown === undefined) return "(発話なし)";
+  return shown.length > 44 ? `${shown.slice(0, 44)}…` : shown;
 }
 
 const stamp = (mtimeMs: number): string => {

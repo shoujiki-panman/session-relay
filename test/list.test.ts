@@ -52,6 +52,49 @@ describeSuite("describe: 一覧の1行を作る", () => {
   it("Edge: 複数行の発話は1行目だけ出す", () => {
     expect(describe(write("d.jsonl", typedSession("/w/myproject", ["1行目\n2行目"]))).topic).toBe("1行目");
   });
+  it("Edge: スクショを落としただけの発話は見出しにしない（4行が同じ見た目になっていた）", () => {
+    const drop = "/var/folders/2_/vn83/T/mulmoterminal-drops/c44a44e9/09e28bda-49e7-438a-8f4b-d8714b7329c9.png";
+    const listed = describe(write("f.jsonl", typedSession("/w/myproject", [drop, "これは大元の影響？"])));
+    expect(listed.topic).toBe("これは大元の影響？");
+  });
+  it("Edge: パスに続けて書かれた本文は残す", () => {
+    const text = "'/Users/me/Desktop/スクリーンショット 2026-08-25 23.30.34.png' これは確かに。下げるツールを作りたい";
+    expect(describe(write("g.jsonl", typedSession("/w/p", [text]))).topic).toBe("これは確かに。下げるツールを作りたい");
+  });
+  it("Corner: パスしか無い発話は、ファイル名を見出しにする（全部「発話なし」にしない）", () => {
+    const shot = "'/Users/me/Desktop/スクリーンショット 2026-08-24 21.52.32.png'";
+    expect(describe(write("n.jsonl", typedSession("/w/p", [shot]))).topic).toBe("スクリーンショット 2026-08-24 21.52.32");
+  });
+  it("Corner: 一時ファイルのuuidは名前も捨てる", () => {
+    const drop = "/var/folders/2_/T/mulmoterminal-drops/x/09e28bda-49e7-438a-8f4b-d8714b7329c9.png";
+    expect(describe(write("o.jsonl", typedSession("/w/p", [drop]))).topic).toBe("(発話なし)");
+  });
+  it("Edge: ハーネスが足す [Image: …] は見出しにしない", () => {
+    const note = "[Image: original 2748x1766, displayed at 2000x1285.]";
+    expect(describe(write("h.jsonl", typedSession("/w/p", [note, "ここを修正できる？"]))).topic).toBe("ここを修正できる？");
+  });
+  it("Edge: 相槌だけの発話は飛ばして、中身のある発話を見出しにする", () => {
+    expect(describe(write("i.jsonl", typedSession("/w/p", ["続きから", "はい", "認証のバグを直したい"]))).topic).toBe("認証のバグを直したい");
+  });
+  it("Edge: URLはホスト名まで畳んで、後ろの本文を残す", () => {
+    const text = "https://www.raycast.com/changelog/macos-beta/2-0これ入れようかな";
+    expect(describe(write("j.jsonl", typedSession("/w/p", [text]))).topic).toBe("raycast.com これ入れようかな");
+  });
+  it("Corner: URLを貼っただけの発話は飛ばして次を見出しにする", () => {
+    const url = "https://www.nikkei.com/article/DGXZQOGN3102A0R30C26A7000000/?n_cid=SNSTW001";
+    expect(describe(write("k.jsonl", typedSession("/w/p", [url, "これわれらも作らんかね？"]))).topic).toBe("これわれらも作らんかね？");
+  });
+  it("Corner: 中身のある発話が一つも無ければ、短くてもそのまま出す（空にしない）", () => {
+    const drop = "/var/folders/2_/T/mulmoterminal-drops/cdd8057c/da472a64-3ee3-4655-9652-585f66ab3357.png";
+    expect(describe(write("l.jsonl", typedSession("/w/p", [`${drop} まじ？`]))).topic).toBe("まじ？");
+  });
+  it("Corner: 改行で始まる発話でも見出しになる（1行目だけ見て「発話なし」になっていた）", () => {
+    expect(describe(write("m.jsonl", typedSession("/w/p", ["\n- 記事と一次情報を実際に当たって確かめる"]))).topic).toBe("- 記事と一次情報を実際に当たって確かめる");
+  });
+  it("Edge: ハーネスが差し込むタグは落として、人が書いた中身を見出しにする", () => {
+    const wrapped = '<scheduled-task name="weekly-report-draft" freq="weekly">週報の下書きを作る</scheduled-task>';
+    expect(describe(write("p.jsonl", typedSession("/w/p", [wrapped]))).topic).toBe("週報の下書きを作る");
+  });
   it("Error: 発話が無くても落ちない", () => {
     expect(describe(write("e.jsonl", typedSession("/w/myproject", ["<system-reminder>x"]))).topic).toBe("(発話なし)");
   });
