@@ -10,7 +10,7 @@
  * （AGENTS.md はリポジトリ直下の1枚、Cline の Memory Bank はプロジェクトの状態）。
  * ここでも束ねる単位をプロジェクトにして、選んでから会話に降りる。
  */
-import type { Listed } from "./list.ts";
+import { type Listed, NO_TALK } from "./list.ts";
 
 export interface Project {
   readonly name: string;
@@ -61,13 +61,23 @@ export function pickProject(projects: readonly Project[], key: string): Project 
   return projects.find((row) => row.name.toLowerCase().startsWith(lower)) ?? null;
 }
 
+/**
+ * そのプロジェクトが「何の話か」。
+ * 一番新しい会話が空（スクショ1枚だけ、起動しただけ）のことがあり、
+ * それを見出しにするとプロジェクトごと「(発話なし)」になって選べない（実測 2026-08-28）。
+ */
+export function headline(project: Project): string {
+  const talked = project.sessions.find((session) => session.topic !== NO_TALK);
+  return (talked ?? project.sessions[0])?.topic ?? "";
+}
+
 export function renderProjects(projects: readonly Project[]): string {
   const width = Math.max(10, ...projects.map((row) => row.name.length));
   const header = `  #  ${"プロジェクト".padEnd(width)}  最終          会話  直近の話`;
   const rows = projects.map((row, i) => {
     const no = String(i + 1).padStart(3);
     const count = String(row.sessions.length).padStart(4);
-    const topic = row.sessions[0]?.topic ?? "";
+    const topic = headline(row);
     return `${no}  ${row.name.padEnd(width)}  ${row.when}  ${count}  ${topic}`;
   });
   return [header, ...rows, ""].join("\n");

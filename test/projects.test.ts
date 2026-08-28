@@ -1,6 +1,6 @@
 import { describe as describeSuite, expect, it } from "vitest";
 import type { Listed } from "../src/list.ts";
-import { groupByProject, pickProject, renderProjects } from "../src/projects.ts";
+import { groupByProject, headline, pickProject, renderProjects } from "../src/projects.ts";
 
 const row = (ref: string, cwd: string | null, place: string, when: string, topic: string): Listed => ({
   path: `/p/${ref}`, ref, cwd, place, harness: "claude", when, topic, utterances: 3, typed: true,
@@ -63,5 +63,34 @@ describeSuite("renderProjects: 見て選べる形にする", () => {
   });
   it("Edge: 空でも落ちない", () => {
     expect(renderProjects([])).toContain("#");
+  });
+});
+
+/** 型アサーションは禁止なので、束ねた先頭を安全に取り出す */
+const headOf = (rows: readonly Listed[]): string => {
+  const [first] = groupByProject(rows);
+  return first === undefined ? "(プロジェクトなし)" : headline(first);
+};
+
+describeSuite("プロジェクトの見出し", () => {
+  it("一番新しい会話が空でも、中身のある会話から見出しを採る", () => {
+    expect(
+      headOf([
+        row("aaa", "/w/relay", "relay", "08/28 23:11", "(発話なし)"),
+        row("bbb", "/w/relay", "relay", "08/28 22:00", "これだとわからんな。。。"),
+      ]),
+    ).toBe("これだとわからんな。。。");
+  });
+
+  it("全部空なら、その事実をそのまま出す（別の見出しを捏造しない）", () => {
+    expect(headOf([row("aaa", "/w/relay", "relay", "08/28 23:11", "(発話なし)")])).toBe("(発話なし)");
+  });
+
+  it("一覧の行にも、空ではない見出しが出る", () => {
+    const projects = groupByProject([
+      row("aaa", "/w/relay", "relay", "08/28 23:11", "(発話なし)"),
+      row("bbb", "/w/relay", "relay", "08/28 22:00", "MCPやるか"),
+    ]);
+    expect(renderProjects(projects)).toContain("MCPやるか");
   });
 });

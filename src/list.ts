@@ -143,11 +143,14 @@ const alive = (list: readonly string[]): string[] => list.filter((text) => text 
  * ファイル名は「他に何も残らなかったとき」だけ使う。先に混ぜると
  * `スクリーンショット 2026-08-25 23.30.34` が44文字の枠を食って本文を押し出す（実測）。
  */
+/** 見出しに出せるものが何も残らなかった会話（スクショ1枚だけ、など） */
+export const NO_TALK = "(発話なし)";
+
 function topicOf(utterances: readonly string[]): string {
   const bare = alive(utterances.map(clean));
   const named = alive(utterances.map(withNames));
   const shown = bare.find(meaty) ?? named.find(meaty) ?? bare[0] ?? named[0];
-  if (shown === undefined) return "(発話なし)";
+  if (shown === undefined) return NO_TALK;
   return shown.length > 44 ? `${shown.slice(0, 44)}…` : shown;
 }
 
