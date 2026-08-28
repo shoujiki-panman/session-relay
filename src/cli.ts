@@ -1,7 +1,10 @@
 /**
  * 会話を別スレッド／別ハーネスへ渡す。
+ *   relay --projects [件数]             プロジェクト単位の一覧（選ぶ単位はこちらが既定）
+ *   relay --canvas [出力先]             プロジェクトと会話を .canvas に書き出す
  *   relay --pick [検索語] [--all]       その場で選ぶ（↑↓・打つと絞る・Enter・Esc）
- *   relay --list [件数] [--all]         一覧を出すだけ（スキルや貼り付け用）
+ *   relay --list [件数] [--all] [--in <#|名前>]
+ *                                       会話の一覧。--in でプロジェクトを絞る
  *   relay [--to claude|codex] [--print] [--previous] [--from <#|ref>]
  *       いまの会話を新しいセッションで開く。
  *       --previous を付けると「自分ではなく直前の会話」を引く
@@ -9,9 +12,11 @@
  *   show <session.jsonl>                  射影の中身を確かめる
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { toCanvas } from "./canvas.ts";
+import { type Project, groupByProject, pickProject, renderProjects } from "./projects.ts";
 import { buildContext, buildContextFrom } from "./context.ts";
-import { describe, pick, renderTable } from "./list.ts";
+import { type Listed, describe, pick, renderTable } from "./list.ts";
 import { pickInteractively } from "./run-picker.ts";
 import { extractSession, humanUtterances } from "./extract.ts";
 import { readRepoSignals } from "./repo.ts";
@@ -52,13 +57,92 @@ function currentContext(cwd: string): string | null {
   return buildContext(sessionPath, readRepoSignals(cwd));
 }
 
-/** 一覧を出す。ディレクトリを問わず、新しい順 */
-function humanSessions(limit: number, onlyCwd: string | null): ReturnType<typeof describe>[] {
-  // 下請けの記録が混ざるので、多めに拾ってから人が打った会話だけ残す
-  return recentSessions(undefined, limit * 8, onlyCwd)
-    .map(describe)
-    .filter((row) => row.typed)
-    .slice(0, limit);
+/**
+ * 人が打った会話を、必要な数だけ新しい順に集める。
+ *
+ * ファイル数で切ってはいけない。下請け（サブエージェント）の記録は桁違いに多く、
+ * 実測（2026-08-28）では**新しい480本のうち469本が1つのプロジェクトの下請け**で、
+ * 人が打った会話は7本しか残らなかった（プロジェクト一覧が2件になった）。
+ * 数えるのは会話であって、ファイルではない。
+ */
+const SCAN_LIMIT = 4000;
+
+function humanSessions(limit: number, onlyCwd: string | null): Listed[] {
+  const rows: Listed[] = [];
+  for (const entry of recentSessions(undefined, SCAN_LIMIT, onlyCwd)) {
+    const row = describe(entry);
+    if (row.typed) rows.push(row);
+    if (rows.length >= limit) break;
+  }
+  return rows;
+}
+
+/**
+ * プロジェクトに束ねるために先に拾う会話の数。
+ * 束ねる前に切ると、下の方のプロジェクトが1件しか無いように見える。
+ */
+const SCAN = 250;
+
+const projectsOf = (): Project[] => groupByProject(humanSessions(SCAN, null));
+
+/** プロジェクト単位の一覧。「どのプロジェクトの話か分からない」への答え */
+function listProjects(limit: number): number {
+  const rows = humanSessions(SCAN, null);
+  const projects = groupByProject(rows);
+  if (projects.length === 0) {
+    process.stderr.write("会話の記録が見つかりませんでした\n");
+    return 1;
+  }
+  process.stdout.write(renderProjects(projects.slice(0, limit)));
+  // 黙って切らない。切った事実を出さないと「全部見た」と読まれる
+  if (rows.length >= SCAN) {
+    process.stdout.write(`（新しい会話 ${String(SCAN)} 件までを見ています。会話数はその範囲の数）\n`);
+  }
+  process.stdout.write(
+    "会話まで降りるには: relay --list --in <#か名前>／キャンバスに出すには relay --canvas\n",
+  );
+  return 0;
+}
+
+/** `--list` の既定件数。番号はこの一覧で数える */
+const LIST_LIMIT = 15;
+
+/**
+ * 選ぶ対象の会話たち。
+ * `--in` を付けたときは**そのプロジェクトの中だけ**を見る。
+ */
+function candidates(inKey: string | null, cwd: string | null, limit: number): Listed[] {
+  if (inKey === null) return humanSessions(limit, cwd);
+  const chosen = pickProject(projectsOf(), inKey);
+  return chosen === null ? [] : [...chosen.sessions];
+}
+
+/** そのプロジェクトの会話だけを一覧にする */
+function listIn(key: string): number {
+  const chosen = pickProject(projectsOf(), key);
+  if (chosen === null) {
+    process.stderr.write(`「${key}」に当たるプロジェクトがありません（relay --projects で確認）\n`);
+    return 1;
+  }
+  process.stdout.write(renderTable(chosen.sessions));
+  process.stdout.write(`選ぶには: relay --from <#かref> --in ${key}\n`);
+  return 0;
+}
+
+/** プロジェクトと会話を .canvas に書き出す（画面は作らない。Obsidianが開く） */
+function canvas(outPath: string, limit: number): number {
+  const projects = projectsOf().slice(0, limit);
+  if (projects.length === 0) {
+    process.stderr.write("会話の記録が見つかりませんでした\n");
+    return 1;
+  }
+  writeFileSync(outPath, toCanvas(projects), "utf8");
+  const sessions = projects.reduce((total, row) => total + row.sessions.length, 0);
+  process.stderr.write(
+    `${outPath} に書き出しました（プロジェクト ${String(projects.length)} / 会話 ${String(sessions)}）\n` +
+      "ObsidianのVaultに置くと、そのままキャンバスとして開けます\n",
+  );
+  return 0;
 }
 
 /**
@@ -109,9 +193,21 @@ async function pickedContext(query: string, all: boolean, cwd: string): Promise<
   return buildContext(chosen.path, readRepoSignals(chosen.cwd ?? cwd));
 }
 
-/** 一覧から選んだ1本を渡す。ディレクトリが違っても引ける */
-function chosenContext(key: string, cwd: string): string | null {
-  const chosen = pick(humanSessions(40, null), key);
+/**
+ * 一覧から選んだ1本を渡す。ディレクトリが違っても引ける。
+ *
+ * **番号と ref で数える相手を変える。**
+ * 番号は「画面に出ていた一覧」の中でしか意味を持たない。広い一覧で数えると
+ * 番号が指す会話がずれる（この道具が何度も踏んだ穴）。
+ * ref は一意なのでずれない。だから ref のときだけ広く探す。
+ * キャンバスのカードに書いてあるのも ref。
+ */
+function chosenContext(key: string, cwd: string, inKey: string | null, all: boolean): string | null {
+  const byNumber = Number.isInteger(Number(key));
+  const rows = byNumber
+    ? candidates(inKey, all ? null : cwd, LIST_LIMIT)
+    : candidates(inKey, null, SCAN);
+  const chosen = pick(rows, key);
   if (chosen === null) return null;
   process.stderr.write(`選んだ会話: ${chosen.place} / ${chosen.topic}\n`);
   // gitは「選んだ会話が動いていた場所」を見る。いまいる場所ではない
@@ -129,9 +225,10 @@ async function chooseContext(
   from: string | null,
   picking: Picking,
   cwd: string,
+  inKey: string | null,
 ): Promise<string | null> {
   if (picking.on) return pickedContext(picking.query, picking.all, cwd);
-  if (from !== null) return chosenContext(from, cwd);
+  if (from !== null) return chosenContext(from, cwd, inKey, picking.all);
   return usePrevious ? previousContext(cwd) : currentContext(cwd);
 }
 
@@ -141,9 +238,10 @@ async function relay(
   usePrevious: boolean,
   from: string | null,
   picking: Picking,
+  inKey: string | null,
 ): Promise<number> {
   const cwd = process.cwd();
-  const context = await chooseContext(usePrevious, from, picking, cwd);
+  const context = await chooseContext(usePrevious, from, picking, cwd, inKey);
   if (context === null) {
     if (!picking.on) process.stderr.write(chooseMessage(usePrevious, from));
     return 1;
@@ -173,7 +271,18 @@ if (command === "relay") {
   const target = toIndex >= 0 ? (args[toIndex + 1] ?? "claude") : "claude";
   const fromIndex = args.indexOf("--from");
   const from = fromIndex >= 0 ? (args[fromIndex + 1] ?? null) : null;
-  if (args.includes("--list")) {
+  const inIndex = args.indexOf("--in");
+  const inKey = inIndex >= 0 ? (args[inIndex + 1] ?? null) : null;
+  if (args.includes("--projects")) {
+    const asked = Number(args[args.indexOf("--projects") + 1]);
+    process.exitCode = listProjects(Number.isInteger(asked) && asked > 0 ? asked : 12);
+  } else if (args.includes("--canvas")) {
+    const given = args[args.indexOf("--canvas") + 1];
+    const out = given === undefined || given.startsWith("--") ? "relay.canvas" : given;
+    process.exitCode = canvas(out, 12);
+  } else if (inKey !== null && args.includes("--list")) {
+    process.exitCode = listIn(inKey);
+  } else if (args.includes("--list")) {
     const listIndex = args.indexOf("--list");
     const asked = Number(args[listIndex + 1]);
     process.exitCode = list(Number.isInteger(asked) && asked > 0 ? asked : 15, args.includes("--all"));
@@ -191,11 +300,12 @@ if (command === "relay") {
       args.includes("--previous"),
       from,
       picking,
+      inKey,
     );
   }
 } else if (command === "show" && args[1] !== undefined) {
   process.exitCode = show(args[1]);
 } else {
-  process.stderr.write("使い方: relay --pick [検索語] [--all] / relay --list [件数] [--all] / relay [--to claude|codex] [--print] [--previous] [--from <#|ref>] / relay show <path>\n");
+  process.stderr.write("使い方: relay --projects [件数] / relay --canvas [出力先] / relay --pick [検索語] [--all] / relay --list [件数] [--all] [--in <#|名前>] / relay [--to claude|codex] [--print] [--previous] [--from <#|ref>] / relay show <path>\n");
   process.exitCode = 2;
 }

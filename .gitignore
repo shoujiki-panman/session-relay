@@ -6,3 +6,5 @@ node_modules/
 *.sqlite*
 .env
 .env.*
+# 書き出したキャンバス（中身は会話の見出し＝個人的な内容）
+*.canvas
