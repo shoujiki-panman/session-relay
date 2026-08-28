@@ -14,13 +14,21 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { toCanvas } from "./canvas.ts";
-import { type Project, groupByProject, pickProject, renderProjects } from "./projects.ts";
-import { buildContext, buildContextFrom } from "./context.ts";
-import { type Listed, describe, pick, renderTable } from "./list.ts";
+import { groupByProject, pickProject, renderProjects } from "./projects.ts";
+import { buildContext } from "./context.ts";
+import { renderTable } from "./list.ts";
 import { pickInteractively } from "./run-picker.ts";
 import { extractSession, humanUtterances } from "./extract.ts";
 import { readRepoSignals } from "./repo.ts";
-import { currentSessionFor, previousSessionsFor, recentSessions } from "./sessions.ts";
+import { currentSessionFor } from "./sessions.ts";
+import {
+  SCAN,
+  chooseByKey,
+  contextOf,
+  humanSessions,
+  previousIn,
+  projectsOf,
+} from "./query.ts";
 
 function show(path: string): number {
   const record = extractSession(readFileSync(path, "utf8"));
@@ -45,7 +53,7 @@ function show(path: string): number {
 
 /** 直前の会話（自分ではない方）を引く。中身のある最初の1本を返す */
 function previousContext(cwd: string): string | null {
-  const built = buildContextFrom(previousSessionsFor(cwd), readRepoSignals(cwd));
+  const built = previousIn(cwd);
   if (built === null) return null;
   process.stderr.write(`直前の会話: ${built.path}\n`);
   return built.context;
@@ -56,34 +64,6 @@ function currentContext(cwd: string): string | null {
   if (sessionPath === null) return null;
   return buildContext(sessionPath, readRepoSignals(cwd));
 }
-
-/**
- * 人が打った会話を、必要な数だけ新しい順に集める。
- *
- * ファイル数で切ってはいけない。下請け（サブエージェント）の記録は桁違いに多く、
- * 実測（2026-08-28）では**新しい480本のうち469本が1つのプロジェクトの下請け**で、
- * 人が打った会話は7本しか残らなかった（プロジェクト一覧が2件になった）。
- * 数えるのは会話であって、ファイルではない。
- */
-const SCAN_LIMIT = 4000;
-
-function humanSessions(limit: number, onlyCwd: string | null): Listed[] {
-  const rows: Listed[] = [];
-  for (const entry of recentSessions(undefined, SCAN_LIMIT, onlyCwd)) {
-    const row = describe(entry);
-    if (row.typed) rows.push(row);
-    if (rows.length >= limit) break;
-  }
-  return rows;
-}
-
-/**
- * プロジェクトに束ねるために先に拾う会話の数。
- * 束ねる前に切ると、下の方のプロジェクトが1件しか無いように見える。
- */
-const SCAN = 250;
-
-const projectsOf = (): Project[] => groupByProject(humanSessions(SCAN, null));
 
 /** プロジェクト単位の一覧。「どのプロジェクトの話か分からない」への答え */
 function listProjects(limit: number): number {
@@ -102,19 +82,6 @@ function listProjects(limit: number): number {
     "会話まで降りるには: relay --list --in <#か名前>／キャンバスに出すには relay --canvas\n",
   );
   return 0;
-}
-
-/** `--list` の既定件数。番号はこの一覧で数える */
-const LIST_LIMIT = 15;
-
-/**
- * 選ぶ対象の会話たち。
- * `--in` を付けたときは**そのプロジェクトの中だけ**を見る。
- */
-function candidates(inKey: string | null, cwd: string | null, limit: number): Listed[] {
-  if (inKey === null) return humanSessions(limit, cwd);
-  const chosen = pickProject(projectsOf(), inKey);
-  return chosen === null ? [] : [...chosen.sessions];
 }
 
 /** そのプロジェクトの会話だけを一覧にする */
@@ -193,25 +160,12 @@ async function pickedContext(query: string, all: boolean, cwd: string): Promise<
   return buildContext(chosen.path, readRepoSignals(chosen.cwd ?? cwd));
 }
 
-/**
- * 一覧から選んだ1本を渡す。ディレクトリが違っても引ける。
- *
- * **番号と ref で数える相手を変える。**
- * 番号は「画面に出ていた一覧」の中でしか意味を持たない。広い一覧で数えると
- * 番号が指す会話がずれる（この道具が何度も踏んだ穴）。
- * ref は一意なのでずれない。だから ref のときだけ広く探す。
- * キャンバスのカードに書いてあるのも ref。
- */
+/** 一覧から選んだ1本を渡す。ディレクトリが違っても引ける（数え方は query.ts） */
 function chosenContext(key: string, cwd: string, inKey: string | null, all: boolean): string | null {
-  const byNumber = Number.isInteger(Number(key));
-  const rows = byNumber
-    ? candidates(inKey, all ? null : cwd, LIST_LIMIT)
-    : candidates(inKey, null, SCAN);
-  const chosen = pick(rows, key);
+  const chosen = chooseByKey(key, cwd, inKey, all);
   if (chosen === null) return null;
   process.stderr.write(`選んだ会話: ${chosen.place} / ${chosen.topic}\n`);
-  // gitは「選んだ会話が動いていた場所」を見る。いまいる場所ではない
-  return buildContext(chosen.path, readRepoSignals(chosen.cwd ?? cwd));
+  return contextOf(chosen, cwd);
 }
 
 interface Picking {

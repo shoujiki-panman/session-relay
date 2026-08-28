@@ -10,6 +10,8 @@
     "verbatimModuleSyntax": true,
     "noEmit": true,
     "strict": true,
+    // MCP SDKの型定義がDOM前提（HeadersInit）。自分のコードの検査は緩めない
+    "skipLibCheck": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
