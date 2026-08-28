@@ -95,12 +95,14 @@ Claude Code の会話をそのまま再開したいだけなら `claude -r`（�
 
 ## 使うには
 
-Node 24.16 で動かしている（`--experimental-strip-types` を使うので、型剥がしが使えるNodeが要る）。
-
 ```sh
-npm install
-ln -s "$PWD/bin/relay" ~/.local/bin/relay
+npm install -g @shoujiki-panman/session-relay   # relay コマンドが入る
+npx @shoujiki-panman/session-relay --projects   # 入れずに試す
 ```
+
+手元で開発するなら clone して `npm install` と `ln -s "$PWD/bin/relay" ~/.local/bin/relay`。
+配るのはビルド済みの `dist` だけで、`src` の `.ts` は入れていない——
+**Nodeは `node_modules` の中では型を剥がさない**ので、`.ts` を配ると入れた人の環境で動かない。
 
 `~/.claude/projects/**/*.jsonl`（Claude Code）と
 `~/.codex/sessions/YYYY/MM/DD/*.jsonl`（Codex）の**両方を自動で見つける**。
@@ -124,11 +126,41 @@ ln -s "$PWD/skills/relay" ~/.codex/skills/relay    # Codex（同じ形式で効�
 スマホから母艦のセッションに入る場合（Claude Codeの Remote Control）も、これで1手になる。
 コピペもファイルの受け渡しも要らない。
 
+### MCP: AIが自分で取りに来る
+
+貼るのをやめる。MCPサーバーとして繋ぐと、**渡された側のAIが自分で文脈を取りに来る**。
+人がやることは「続きから」と言うことだけになる。
+
+```sh
+claude mcp add relay --scope user -- relay mcp   # Claude Code
+codex mcp add relay -- relay mcp                 # Codex
+```
+
+（`relay` は絶対パスで書いたほうが確実。MCPサーバーを起動するのは別のプロセスで、
+`~/.local/bin` が PATH に入っていないことがある）
+
+道具は3つ。AIは上から順に降りてこられる。
+
+| 道具 | 何をするか |
+|---|---|
+| `get_context` | 前の会話を原文のまま返す。**引数なし**＝いまいる場所の直前の会話 |
+| `list_projects` | プロジェクト単位の一覧（どの話の続きかを選ばせるとき） |
+| `list_conversations` | そのプロジェクトの会話と `ref` |
+
+`ref` を必ず書いて返している。書かないと、AIはもう一度自分で探しに行く。
+
+**標準出力はJSON-RPCで埋まっている。** 何かを知らせたいときは stderr に書くこと——
+1行でも標準出力に混ざると通信が壊れる。
+
 ## いまの限界（分かっていて残していること）
 
 - gitの欄は **relay を打ったディレクトリ**のリポジトリを映す。会話の話題と別のリポジトリのことがある（`場所:` を明記して区別できるようにしてある）
 - 触ったファイルの一覧は Read/Edit/Write の入力からしか採れない。**Bashだけで作業すると空に近くなる**
 - `--previous` は「自分以外で最も新しい会話」なので、**同じディレクトリで別のセッションが並行して動いていると、そちらを引く**
+- **Codexの headless（`codex exec`）はMCPの呼び出しを承認せずに落とす**。実測（2026-08-28）では
+  ツールを見つけて `get_context` を呼ぶところまで行くが、0秒で `user cancelled MCP tool call` になる。
+  `approval_policy = "never"` でも変わらない（Codex側の判定。対話TUIなら本人が承認できる）
+- **一覧は3秒前後かかる**（記録を最大4000本走査するため。実測: `list_projects` 3.5秒）。索引ができれば消える
 - **Codexは会話を確実に特定できない**。Claude Codeは `CLAUDE_CODE_SESSION_ID` を環境変数で渡してくるが、
   Codexは渡してこない（codex-cli 0.147.0 で実測）。記録の先頭行 `session_meta` にidはあるが、
   「いま自分がどれか」は分からないので、cwd一致＋新しい順の当て推量になる
@@ -140,7 +172,9 @@ ln -s "$PWD/skills/relay" ~/.codex/skills/relay    # Codex（同じ形式で効�
 - [x] **Phase 1** 抽出器（射影）。Claude Code / Codex 両対応
 - [x] **Phase 2** 結果の信号（ターンの最後・git）。渡された先が進捗を過小評価しないように
 - [x] **Phase 3の入口** `relay` コマンド／ヘッダーボタン／`relay` スキル（「続きから」の1手）
-- [ ] **Phase 3** 新セッション起動時に、宙に浮いた会話へ**自動で気づく**導線
+- [x] **Phase 3** MCPサーバー（AIが自分で取りに来る）。Claude Code で接続を確認
+- [ ] Codexの対話TUIで「続きから」が通ることの確認（headlessは承認で落ちる）
+- [ ] 配布（`npx` で入る形。npmの `session-relay` は別人が使用中）
 - [ ] 索引（複数の会話から探して引く）
 
 ## 開発の決まりごと

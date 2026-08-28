@@ -97,8 +97,30 @@
   - 上限（64MB）内で一番大きいものを使う。**テスト全体が32秒→1.4秒**になった
   - テスト**163件**緑（+22件）／厳格lint・strict型チェックも緑
 
+- [x] 🔌 **Phase 3: MCPサーバー**（2026-08-28）: 貼るのをやめ、**受け取る側のAIが自分で取りに来る**形にした
+  - `src/mcp.ts`（道具3つ＋プロンプト`resume`）／`src/mcp-answers.ts`（返す文面）／`relay mcp` で起動
+  - 公式SDK（`@modelcontextprotocol/sdk` 1.30）を使う。KICKOFFの「公式の手順はそのまま再現する」に従った。**初めての依存**（それまで0）
+  - `src/query.ts` を切り出した。CLIとMCPが**同じ探索処理**を使う（番号とrefの数え分けもここ）
+  - **実測（本物のMCPクライアントで接続）**: `list_projects` 3.5秒/20件・`list_conversations` 2.8秒・`get_context` 引数なし **0.4秒/52KB**・当たらないrefは `isError` で返る
+  - 置き先: Claude Code（`claude mcp add relay --scope user`）は **✔ Connected**／Codex（`codex mcp add relay`）も登録済み
+  - ⚠️ **Codexの headless は承認で落ちる**（実測）: `codex exec` はツールを見つけて `mcp__relay__get_context` を呼ぶところまで行くが、**0秒で `user cancelled MCP tool call`**。`approval_policy="never"` でも同じ。Codex側の判定なので、**対話TUIで本人が承認する形なら通るはず（未確認）**
+  - テスト**173件**緑（+10）。うち3件は**本物のMCPクライアントでstdio接続**して道具が見えることを確認する（中身の走査はテストに入れない——数秒に膨らむ）
+  - 📌 **npmの `session-relay` は別人が使用中**（1.3.2・中国語の「会话接力」＝同じ領域の道具）。配布名は未決
+
+- [x] 📦 **npmで配れる形にした**（2026-08-28）: 名前は **`@shoujiki-panman/session-relay`**（素の名前は `session-relay` / `relay-session` / `ai-relay` / `session-handoff` / `handoff-relay` すべて他人が使用中。スコープ付きなら名前を変えずに済む）
+  - `npm run build`（`tsconfig.build.json`・`rewriteRelativeImportExtensions` で `./x.ts` → `./x.js`）／`bin/relay.js`（Windowsでも動く入口）／`files` は dist・bin・skills だけ
+  - **`src` の `.ts` は配らない**。Nodeは `node_modules` の中では型を剥がさない（`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`）ので、TSのまま配ると入れた人の環境で動かない
+  - **実測**: `npm pack` → 別ディレクトリに install → `relay --projects` が動き、MCPも道具3つ・`get_context` 51KB/781ms・`list_projects` 3.5秒で返った
+  - まだ **publish していない**（名前だけ決めた状態）
+
+- [x] 🐛 **プロジェクトの見出しが「(発話なし)」になっていたのを修正**（2026-08-28）
+  - 一番新しい会話が空（起動しただけ・スクショ1枚）だと、**プロジェクトごと「(発話なし)」**に見えて選べない。`headline()` で中身のある会話から採る
+  - 破壊テスト済み（`sessions[0].topic` に戻すと2件赤 → 戻すと緑）
+
 ## 🔨 いまやっていること
-- ヘッダーボタンを**実際に押して**確かめる（上の⚠️）。通れば Phase 3の入口は完了
+- Codexの**対話TUI**で「続きから」→ MCP承認 → 現在地が答えられるかを確かめる（headlessは落ちる・上の⚠️）
+- 配布の形を決める（npx で入る／名前が空いていない）
+- ヘッダーボタンを**実際に押して**確かめる（Phase 3の入口の残り）
 
 ## ⚠️ いまの限界（分かっていて残していること）
 - gitの欄は**relayを打ったディレクトリ**のリポジトリを映す。会話の話題と別のリポジトリのことがある
