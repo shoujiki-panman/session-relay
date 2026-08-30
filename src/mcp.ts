@@ -15,12 +15,13 @@ import {
   type Answer,
   answerContext,
   answerConversations,
+  answerMatches,
   answerProjects,
   noPrevious,
   noSuchRef,
 } from "./mcp-answers.ts";
 import { pickProject } from "./projects.ts";
-import { chooseByKey, contextOf, previousIn, projectsOf } from "./query.ts";
+import { chooseByKey, contextOf, findByWords, previousIn, projectsOf } from "./query.ts";
 
 /** SDKが受け取る形。書き換え可の配列＋追加項目を許す形でないと通らない */
 interface ToolResult {
@@ -49,6 +50,15 @@ function contextAnswer(ref: string | undefined, cwd: string): Answer {
   return context === null ? noSuchRef(ref) : answerContext(context);
 }
 
+/** 本人の言葉で探す。1本に決まればそのまま渡す（refを聞き返さないため） */
+function wordsAnswer(words: string, cwd: string): Answer {
+  const hits = findByWords(words);
+  const [only] = hits;
+  if (only === undefined || hits.length > 1) return answerMatches(words, hits);
+  const context = contextOf(only, cwd);
+  return context === null ? answerMatches(words, []) : answerContext(context);
+}
+
 const RESUME_HINT =
   "ユーザーが「続きから」「さっきの続き」と言ったら、まずこれを引数なしで呼ぶ。";
 
@@ -59,15 +69,25 @@ function addContextTool(server: McpServer): void {
       title: "前の会話を引き継ぐ",
       description:
         "前の会話でこの人が実際に打った言葉を、要約せず原文のまま返す（経過・触ったファイル・gitの状態つき）。" +
-        `${RESUME_HINT} 別のプロジェクトの会話を続けるときだけ ref を渡す。`,
+        `${RESUME_HINT} 別の話の続きなら、本人が言った言葉をそのまま about に渡す` +
+        "（「地図の話の続き」なら about=\"地図\"）。**本人に ref や番号を聞き返さないこと。**",
       inputSchema: {
         ref: z
           .string()
           .optional()
           .describe("list_conversations が返した ref。省略すると、いまいる場所の直前の会話"),
+        about: z
+          .string()
+          .optional()
+          .describe("本人が言った言葉で探す。見出しと置き場所に当てる"),
       },
     },
-    ({ ref }) => reply(contextAnswer(ref, process.cwd())),
+    ({ ref, about }) =>
+      reply(
+        about === undefined || about === ""
+          ? contextAnswer(ref, process.cwd())
+          : wordsAnswer(about, process.cwd()),
+      ),
   );
 }
 

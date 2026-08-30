@@ -19,6 +19,10 @@ relay --list --all       他のプロジェクトの会話も見る
 relay --from 3           一覧の3番の会話を引く
 relay --from c44a44e9    refで引く（番号と違い、どれだけ古くても当たる）
 relay --canvas           プロジェクトと会話を .canvas に書き出す
+
+relay install            MCPと「続きから」スキルをまとめて登録する
+relay mcp                MCPサーバーとして話す（AIが自分で取りに来る）
+relay --help             使い方を出す
 ```
 
 **選ぶ単位は会話ではなくプロジェクト。** 会話を単位にすると、選ぶときに出るのが
@@ -126,18 +130,52 @@ ln -s "$PWD/skills/relay" ~/.codex/skills/relay    # Codex（同じ形式で効�
 スマホから母艦のセッションに入る場合（Claude Codeの Remote Control）も、これで1手になる。
 コピペもファイルの受け渡しも要らない。
 
+### MulmoTerminal に一覧を出す（タップで続きから）
+
+コマンドを打ちたくないとき用。会話の一覧を**見えているものから選ぶ**。
+
+```sh
+cp -R skills/relay-chats <ワークスペース>/data/skills/relay-chats
+relay --records <ワークスペース>/data/relay-chats/items
+```
+
+「会話の続き」というコレクションが増える。**タップすると新しいチャットが
+下書き付きで開く**（送信するのは本人。押しただけでは何も起きない）。
+下書きには `get_context` を ref 付きで呼ぶ指示が入っているので、
+送ればそのAIが前の会話を読み込んでから続ける。
+
+画面は作っていない——MulmoTerminalのコレクションとカスタムビューに乗せているだけ。
+一覧が古くなったら、ビューの「一覧を更新」か、チャットで「一覧を更新して」と言う。
+
 ### MCP: AIが自分で取りに来る
 
 貼るのをやめる。MCPサーバーとして繋ぐと、**渡された側のAIが自分で文脈を取りに来る**。
-人がやることは「続きから」と言うことだけになる。
+一度入れたら、**コマンドは打たない**。新しいチャットで普通に話しかけるだけ。
 
-```sh
-claude mcp add relay --scope user -- relay mcp   # Claude Code
-codex mcp add relay -- relay mcp                 # Codex
+```
+「続きから」
+「キャンバスの話の続きをやりたい。前にどこまで話したか教えて」
+「前の会話で私が実際に打った言葉を3つ、原文のまま」
 ```
 
-（`relay` は絶対パスで書いたほうが確実。MCPサーバーを起動するのは別のプロセスで、
-`~/.local/bin` が PATH に入っていないことがある）
+実測（2026-08-29・文脈ゼロの新しいセッション）: 3つとも、AIが自分で会話を探して答えた。
+**番号も ref も打っていない。** 本人の言葉は `about` としてそのまま渡る。
+
+```sh
+relay install             # MCPと「続きから」スキルをまとめて登録する
+relay install --dry-run   # 何をするかだけ見る
+```
+
+入っているハーネス（Claude Code / Codex）を見て登録する。**2度目は何もしない**。
+入っていないハーネスには何も置かない。
+
+手で書くなら次のとおり。**絶対パスで書くこと**——MCPサーバーを起動するのは
+別のプロセスで、`~/.local/bin` が PATH に入っていないことがある。
+
+```sh
+claude mcp add relay --scope user -- /絶対パス/bin/relay.js mcp
+codex mcp add relay -- /絶対パス/bin/relay.js mcp
+```
 
 道具は3つ。AIは上から順に降りてこられる。
 
@@ -160,7 +198,10 @@ codex mcp add relay -- relay mcp                 # Codex
 - **Codexの headless（`codex exec`）はMCPの呼び出しを承認せずに落とす**。実測（2026-08-28）では
   ツールを見つけて `get_context` を呼ぶところまで行くが、0秒で `user cancelled MCP tool call` になる。
   `approval_policy = "never"` でも変わらない（Codex側の判定。対話TUIなら本人が承認できる）
-- **一覧は3秒前後かかる**（記録を最大4000本走査するため。実測: `list_projects` 3.5秒）。索引ができれば消える
+- **一覧の見出しは覚えている**（`~/.cache/session-relay/list.json`）。会話は終われば変わらないので、
+  更新時刻が同じなら読み直さない。実測: `list_projects` **3.5秒 → 49ms**。
+  中身には見出し（発話の先頭44文字）と作業ディレクトリが入る——**手元から出ない**のは他と同じ
+- **`get_context` は毎回読む**（実測2.3秒）。会話は続いているので、覚えたら古くなる。ここは速くしない
 - **Codexは会話を確実に特定できない**。Claude Codeは `CLAUDE_CODE_SESSION_ID` を環境変数で渡してくるが、
   Codexは渡してこない（codex-cli 0.147.0 で実測）。記録の先頭行 `session_meta` にidはあるが、
   「いま自分がどれか」は分からないので、cwd一致＋新しい順の当て推量になる

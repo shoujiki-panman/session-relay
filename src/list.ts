@@ -42,6 +42,12 @@ export interface Listed {
   readonly utterances: number;
   /** 人が実際に打った会話か（下請けの記録を一覧から外すため） */
   readonly typed: boolean;
+  /**
+   * 言葉で探すための本文（小文字・長さ上限あり）。表示には使わない。
+   * 見出しだけを見ていると、見出しが `(発話なし)` や URL だけの会話は
+   * **どんな言葉でも呼べない**（実測 2026-08-30）。話の中身は2つ目以降の発話にある。
+   */
+  readonly words: string;
 }
 
 const HOME_PREFIX = /^\/Users\/[^/]+/;
@@ -124,9 +130,21 @@ const FILLER = new Set([
 /** ホスト名だけ残った発話（＝URLを貼っただけ）も、それ自体は何の話か言っていない */
 const HOST_ONLY = /^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
+/**
+ * ハーネスが流し込む前置き。人が打った言葉ではない。
+ * 実測（2026-08-29）: 予約実行の会話が
+ * `This is an automated run of a scheduled task…` を見出しにして一覧に並んだ。
+ *
+ * 実測（2026-08-30）: それを外してもまだ50本以上残っていた。前置きが
+ * `SECURITY BOUNDARY: the blocks below are passed-through data…` で始まる型で、
+ * 「automated run」はその**後ろ**に来るので先頭一致に掛からなかった。
+ * 本人の言葉:「ブラウザ形式だるいな」——一覧の8割がこれでは、どう見せてもだるい。
+ */
+const INJECTED = /^(this is an automated run|security boundary\b|<[a-z-]+-task\b)/i;
+
 /** 見出しとして意味を持つか */
 const meaty = (text: string): boolean =>
-  text.length >= 6 && !FILLER.has(text) && !HOST_ONLY.test(text);
+  text.length >= 6 && !FILLER.has(text) && !HOST_ONLY.test(text) && !INJECTED.test(text);
 
 const clean = (text: string): string => gist(text, () => " ");
 const withNames = (text: string): string => gist(text, stemOf);
@@ -160,6 +178,32 @@ const stamp = (mtimeMs: number): string => {
   return `${pad(at.getMonth() + 1)}/${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
 };
 
+/**
+ * 一度も人が話していない会話。予約実行がそれで、`promptSource` は typed だが
+ * 中身は全部ハーネスが流し込んだ文（実測 2026-08-29: 一覧に25本並んだ）。
+ * 続きをやる相手ではないので一覧から外す。
+ * スクショ1枚だけの会話（＝人が何かした）は残す。
+ */
+const neverSpoke = (utterances: readonly string[]): boolean =>
+  utterances.length > 0 &&
+  // 生のまま見るのは `<scheduled-task>続けて</scheduled-task>` のため。
+  // 囲いを外してからでは中身の「続けて」が人の言葉に見えてしまう
+  utterances.every((text) => INJECTED.test(text.trimStart()) || INJECTED.test(clean(text)));
+
+/**
+ * 探すための本文の上限。全部覚えると `~/.cache` が会話の写しになる。
+ * 「何の話だったか」を当てるのに要るのは書き出しだけ、という見立て。
+ */
+const SEARCH_CHARS = 400;
+
+/** ハーネスの流し込みは混ぜない（混ぜると全部が同じ言葉で当たる） */
+const searchableFrom = (utterances: readonly string[]): string =>
+  alive(utterances.map(clean))
+    .filter((line) => !INJECTED.test(line))
+    .join(" / ")
+    .slice(0, SEARCH_CHARS)
+    .toLowerCase();
+
 export function describe(entry: SessionEntry): Listed {
   const head = headOf(entry.path);
   const record = extractSession(head);
@@ -173,7 +217,8 @@ export function describe(entry: SessionEntry): Listed {
     when: stamp(entry.mtimeMs),
     topic: topicOf(human),
     utterances: human.length,
-    typed: typedByHuman(head),
+    typed: typedByHuman(head) && !neverSpoke(human),
+    words: searchableFrom(human),
   };
 }
 

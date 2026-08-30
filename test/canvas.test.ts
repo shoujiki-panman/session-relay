@@ -4,7 +4,7 @@ import { buildCanvas, toCanvas } from "../src/canvas.ts";
 import { groupByProject } from "../src/projects.ts";
 
 const row = (ref: string, cwd: string, place: string, topic: string): Listed => ({
-  path: `/p/${ref}`, ref, cwd, place, harness: "claude", when: "08/27 23:50", topic, utterances: 7, typed: true,
+  path: `/p/${ref}`, ref, cwd, place, harness: "claude", when: "08/27 23:50", topic, utterances: 7, typed: true, words: "",
 });
 
 const canvasOf = (rows: readonly Listed[]) => buildCanvas(groupByProject(rows));

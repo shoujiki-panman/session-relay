@@ -3,7 +3,7 @@ import type { Listed } from "../src/list.ts";
 import { groupByProject, headline, pickProject, renderProjects } from "../src/projects.ts";
 
 const row = (ref: string, cwd: string | null, place: string, when: string, topic: string): Listed => ({
-  path: `/p/${ref}`, ref, cwd, place, harness: "claude", when, topic, utterances: 3, typed: true,
+  path: `/p/${ref}`, ref, cwd, place, harness: "claude", when, topic, utterances: 3, typed: true, words: "",
 });
 
 /** 一覧は新しい順で渡ってくる */

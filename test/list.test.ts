@@ -102,8 +102,8 @@ describeSuite("describe: 一覧の1行を作る", () => {
 
 describeSuite("pick: 一覧から1本に決める", () => {
   const rows: Listed[] = [
-    { path: "/a", ref: "aaaa1111", cwd: "/w/a", place: "a", harness: "claude", when: "08/27 01:00", topic: "A", utterances: 3, typed: true },
-    { path: "/b", ref: "bbbb2222", cwd: "/w/b", place: "b", harness: "codex", when: "08/27 00:00", topic: "B", utterances: 5, typed: true },
+    { path: "/a", ref: "aaaa1111", cwd: "/w/a", place: "a", harness: "claude", when: "08/27 01:00", topic: "A", utterances: 3, typed: true, words: "" },
+    { path: "/b", ref: "bbbb2222", cwd: "/w/b", place: "b", harness: "codex", when: "08/27 00:00", topic: "B", utterances: 5, typed: true, words: "" },
   ];
   it("正常系: 番号で選べる（1始まり）", () => {
     expect(pick(rows, "2")?.path).toBe("/b");
@@ -126,7 +126,7 @@ describeSuite("pick: 一覧から1本に決める", () => {
 describeSuite("renderTable: 見て選べる形にする", () => {
   it("正常系: 番号・ref・場所・話が並ぶ", () => {
     const table = renderTable([
-      { path: "/a", ref: "aaaa1111", cwd: "/w/a", place: "myproject", harness: "claude", when: "08/27 01:00", topic: "最初の話", utterances: 3, typed: true },
+      { path: "/a", ref: "aaaa1111", cwd: "/w/a", place: "myproject", harness: "claude", when: "08/27 01:00", topic: "最初の話", utterances: 3, typed: true, words: "" },
     ]);
     expect(table).toContain("aaaa1111");
     expect(table).toContain("myproject");
@@ -151,5 +151,94 @@ describeSuite("ref: Codexの記録も見分けられる名前にする", () => {
     const a = describe(write("rollout-2026-08-26T00-19-28-aaaaaaaa-1111-2222.jsonl", body)).ref;
     const b = describe(write("rollout-2026-08-26T01-19-28-bbbbbbbb-3333-4444.jsonl", body)).ref;
     expect(a).not.toBe(b);
+  });
+});
+
+describeSuite("ハーネスが流し込む前置きは見出しにしない", () => {
+  it("予約実行の自動文は飛ばして、人の言葉を見出しにする", () => {
+    const listed = describe(
+      write(
+        "sched01234.jsonl",
+        typedSession("/w/myproject", [
+          "This is an automated run of a scheduled task. Do the weekly report.",
+          "やっぱり水曜にして",
+        ]),
+      ),
+    );
+    expect(listed.topic).toBe("やっぱり水曜にして");
+  });
+});
+
+describeSuite("一度も人が話していない会話は一覧に出さない", () => {
+  it("予約実行だけの記録は typed から外れる", () => {
+    const listed = describe(
+      write(
+        "auto012345.jsonl",
+        typedSession("/w/myproject", [
+          "This is an automated run of a scheduled task. Write the weekly report.",
+          "<scheduled-task name=\"weekly\">続けて</scheduled-task>",
+        ]),
+      ),
+    );
+    expect(listed.typed).toBe(false);
+  });
+
+  it("人の言葉が1つでもあれば残す", () => {
+    const listed = describe(
+      write(
+        "auto112345.jsonl",
+        typedSession("/w/myproject", [
+          "This is an automated run of a scheduled task.",
+          "やっぱり水曜にして",
+        ]),
+      ),
+    );
+    expect(listed.typed).toBe(true);
+  });
+
+  it("SECURITY BOUNDARY で始まる自動実行も外す", () => {
+    // 実測（2026-08-30）: mulmoclaude の一覧87本のうち50本以上がこの型だった。
+    // 「automated run」は前置きの後ろに来るので、先頭一致では掛からなかった
+    const listed = describe(
+      write(
+        "sec0123456.jsonl",
+        typedSession("/w/myproject", [
+          "SECURITY BOUNDARY: the blocks below are passed-through data.\n" +
+            "This is an automated run of a scheduled task.",
+        ]),
+      ),
+    );
+    expect(listed.typed).toBe(false);
+  });
+});
+
+describeSuite("言葉で呼べるようにする（見出しに出ない話も当てる）", () => {
+  it("2つ目以降の発話も探せる（見出しは最初の1つしか映さない）", () => {
+    const listed = describe(
+      write("words01234.jsonl", typedSession("/w/p", ["認証のバグを直したい", "地図のことを調べたい"])),
+    );
+    expect(listed.topic).toBe("認証のバグを直したい");
+    expect(listed.words).toContain("地図");
+  });
+
+  it("見出しから切り落とされた後ろも探せる（見出しは44文字で切れる）", () => {
+    const long = `${"あ".repeat(60)}検索できる言葉`;
+    const listed = describe(write("words11234.jsonl", typedSession("/w/p", [long])));
+    expect(listed.topic).not.toContain("検索できる言葉");
+    expect(listed.words).toContain("検索できる言葉");
+  });
+
+  it("ハーネスの流し込みは探せる本文に混ぜない（全部が同じ言葉で当たる）", () => {
+    const listed = describe(
+      write(
+        "words21234.jsonl",
+        typedSession("/w/p", [
+          "This is an automated run of a scheduled task.",
+          "やっぱり水曜にして",
+        ]),
+      ),
+    );
+    expect(listed.words).not.toContain("automated");
+    expect(listed.words).toContain("やっぱり水曜");
   });
 });

@@ -9,7 +9,7 @@ const DOWN = `${ESC}[B`;
 
 const row = (place: string, topic: string, ref: string): Listed => ({
   path: `/${ref}`, ref, cwd: `/w/${place}`, place, harness: "claude",
-  when: "08/27 01:00", topic, utterances: 3, typed: true,
+  when: "08/27 01:00", topic, utterances: 3, typed: true, words: "",
 });
 
 const rows: Listed[] = [

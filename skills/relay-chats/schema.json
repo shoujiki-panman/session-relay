@@ -1,0 +1,52 @@
+{
+  "title": "会話の続き",
+  "icon": "forum",
+  "dataPath": "data/relay-chats/items",
+  "primaryKey": "id",
+  "displayField": "topic",
+  "fields": {
+    "id": {
+      "type": "string",
+      "label": "記録",
+      "primary": true,
+      "required": true
+    },
+    "ref": {
+      "type": "string",
+      "label": "ref"
+    },
+    "project": {
+      "type": "string",
+      "label": "プロジェクト"
+    },
+    "topic": {
+      "type": "string",
+      "label": "何の話か"
+    },
+    "when": {
+      "type": "string",
+      "label": "いつ"
+    },
+    "harness": {
+      "type": "string",
+      "label": "どこで"
+    },
+    "utterances": {
+      "type": "number",
+      "label": "発話"
+    },
+    "place": {
+      "type": "string",
+      "label": "場所"
+    }
+  },
+  "views": [
+    {
+      "id": "chats",
+      "label": "続きから",
+      "icon": "play_arrow",
+      "file": "views/chats.html",
+      "capabilities": ["read"]
+    }
+  ]
+}

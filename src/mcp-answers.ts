@@ -55,7 +55,33 @@ export function answerConversations(project: Project | null, key: string): Answe
       `${project.name} の会話（新しい順）:`,
       ...project.sessions.map(sessionLine),
       "",
-      "続きから始めるには get_context に ref を渡す。",
+      PICK_BY_WORDS,
+    ].join("\n"),
+  );
+}
+
+/**
+ * **ref を本人に聞き返させない。**
+ * 打つのが苦手な人にとって、refを言わせるのはコマンドを打たせているのと同じ。
+ * 選ぶのはAIの仕事で、人は「地図の話」と言えばいい。
+ */
+export const PICK_BY_WORDS =
+  "続きに入るには get_context を呼ぶ。ref は上から選んで**あなたが**渡すこと。" +
+  "本人にrefや番号を聞き返さない——本人の言葉（「地図の話」など）は about にそのまま渡せる。";
+
+export function answerMatches(words: string, hits: readonly Listed[]): Answer {
+  if (hits.length === 0) {
+    return fail(
+      `「${words}」に当たる会話が見つかりません。list_projects で近いものを探してください。` +
+        "（見出しと置き場所しか見ていないので、話の途中にしか出てこない言葉は当たりません）",
+    );
+  }
+  return done(
+    [
+      `「${words}」に当たる会話が${String(hits.length)}本あります:`,
+      ...hits.map(sessionLine),
+      "",
+      "どれかを**あなたが**選んで get_context に ref を渡す。迷うなら、見出しを並べて本人に聞く。",
     ].join("\n"),
   );
 }

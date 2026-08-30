@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>続きから</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --line: color-mix(in srgb, currentColor 12%, transparent);
+        --dim: color-mix(in srgb, currentColor 55%, transparent);
+        --hover: color-mix(in srgb, currentColor 6%, transparent);
+      }
+      body {
+        margin: 0;
+        padding: 12px 12px 40px;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+      }
+      .hint {
+        color: var(--dim);
+        font-size: 12px;
+        margin: 0 0 12px;
+      }
+      .project {
+        margin: 0 0 18px;
+      }
+      .project > h2 {
+        font-size: 13px;
+        margin: 0 0 6px;
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      .project > h2 .count {
+        color: var(--dim);
+        font-weight: 400;
+        font-size: 12px;
+      }
+      button.chat {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: none;
+        color: inherit;
+        border: 0;
+        border-top: 1px solid var(--line);
+        padding: 10px 8px;
+        font: inherit;
+        cursor: pointer;
+        border-radius: 6px;
+      }
+      button.chat:hover,
+      button.chat:focus-visible {
+        background: var(--hover);
+      }
+      .topic {
+        display: block;
+        margin-bottom: 2px;
+      }
+      .meta {
+        color: var(--dim);
+        font-size: 12px;
+      }
+      button.link {
+        background: none;
+        border: 0;
+        color: inherit;
+        font: inherit;
+        text-decoration: underline;
+        cursor: pointer;
+        padding: 0 4px;
+      }
+      .empty {
+        color: var(--dim);
+        padding: 24px 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="hint">
+      選ぶと新しいチャットが下書き付きで開きます。送信するまで何も起きません。
+      <button id="refresh" type="button" class="link">一覧を更新</button>
+    </p>
+    <div id="list" class="empty">読み込んでいます…</div>
+
+    <script>
+      // 会話の中身はここには来ない。来るのは見出しだけで、本文は選んだ後に
+      // relay の get_context が読む——選ぶ画面に全文を置く必要はない。
+      const view = window.__MC_VIEW;
+      const FIELDS = "ref,project,topic,when,harness,utterances,place";
+      const listEl = document.getElementById("list");
+      let all = [];
+
+      const load = async () => {
+        const res = await fetch(view.dataUrl + "?fields=" + encodeURIComponent(FIELDS), {
+          headers: { Authorization: "Bearer " + view.token },
+        });
+        if (!res.ok) throw new Error("読み込めませんでした (" + res.status + "): " + (await res.text()));
+        const { items } = await res.json();
+        return items;
+      };
+
+      // 新しい順。when は "MM/DD HH:mm" なので、この形のまま比べれば新しい順になる
+      const byNewest = (a, b) => String(b.when || "").localeCompare(String(a.when || ""));
+
+      const groupByProject = (items) => {
+        const groups = new Map();
+        for (const item of [...items].sort(byNewest)) {
+          const key = item.project || "(場所不明)";
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(item);
+        }
+        return [...groups.entries()];
+      };
+
+      const matches = (item, query) => {
+        if (!query) return true;
+        const needle = query.toLowerCase();
+        return ["topic", "project", "place"].some((key) =>
+          String(item[key] || "").toLowerCase().includes(needle),
+        );
+      };
+
+      // 押しても送信はされない。下書きが入るだけなので、間違えて押しても戻せる
+      const resume = (item) => {
+        view.startChat(
+          [
+            "「" + item.topic + "」の続きから。",
+            "",
+            "relay の get_context を ref " + item.ref + " で呼んで前の会話を読み込み、",
+            "どこまで進んでいたかを一言で確認してから続けてください。",
+          ].join("\n"),
+        );
+      };
+
+      const chatButton = (item) => {
+        const button = document.createElement("button");
+        button.className = "chat";
+        button.type = "button";
+        const topic = document.createElement("span");
+        topic.className = "topic";
+        topic.textContent = item.topic || "(発話なし)";
+        const meta = document.createElement("span");
+        meta.className = "meta";
+        meta.textContent = [item.when, item.harness, "発話 " + (item.utterances ?? 0)]
+          .filter(Boolean)
+          .join(" · ");
+        button.append(topic, meta);
+        button.addEventListener("click", () => resume(item));
+        return button;
+      };
+
+      const render = () => {
+        const shown = all.filter((item) => matches(item, view.searchQuery));
+        listEl.className = shown.length ? "" : "empty";
+        listEl.replaceChildren();
+        if (!shown.length) {
+          listEl.textContent = "当たる会話がありません。";
+          return;
+        }
+        for (const [project, items] of groupByProject(shown)) {
+          const section = document.createElement("section");
+          section.className = "project";
+          const heading = document.createElement("h2");
+          heading.textContent = project;
+          const count = document.createElement("span");
+          count.className = "count";
+          count.textContent = items.length + " 件";
+          heading.append(count);
+          section.append(heading, ...items.map(chatButton));
+          listEl.append(section);
+        }
+      };
+
+      const refresh = async () => {
+        try {
+          all = await load();
+          render();
+        } catch (error) {
+          listEl.className = "empty";
+          listEl.textContent = String(error && error.message ? error.message : error);
+        }
+      };
+
+      // ホスト側にコマンドを走らせる口が無いので、更新はチャットに渡す。
+      // 押しても下書きが入るだけで、送信するのは本人
+      document.getElementById("refresh").addEventListener("click", () => {
+        view.startChat(
+          "会話の一覧を更新して。`relay --records data/relay-chats/items` を実行すればいい。",
+        );
+      });
+
+      view.onChange(refresh);
+      view.onSearchQueryChange(render);
+      refresh();
+    </script>
+  </body>
+</html>

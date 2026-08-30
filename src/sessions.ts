@@ -93,18 +93,26 @@ export interface SessionEntry {
   readonly mtimeMs: number;
 }
 
+/**
+ * 前に読んだ作業ディレクトリを教えてもらう口。
+ * 知らないときは null を返す（そのときだけファイルを読む）。
+ */
+export type KnownCwd = (path: string, mtimeMs: number) => string | null;
+
 /** 置き場所にある会話を、作業ディレクトリを問わず新しい順に返す */
 export function recentSessions(
   roots: readonly string[] = defaultRoots(),
   limit = 20,
   onlyCwd: string | null = null,
+  knownCwd: KnownCwd = () => null,
 ): SessionEntry[] {
   const found = roots.flatMap((root) => jsonlUnder(root));
   found.sort((a, b) => b.mtimeMs - a.mtimeMs);
   const entries: SessionEntry[] = [];
   for (const entry of found) {
     if (entries.length >= limit) break;
-    const cwd = cwdOf(entry.path);
+    // 1本につき32KB読む。4000本だと効くので、分かっているものは読まない
+    const cwd = knownCwd(entry.path, entry.mtimeMs) ?? cwdOf(entry.path);
     if (onlyCwd !== null && cwd !== onlyCwd) continue;
     entries.push({ path: entry.path, cwd, mtimeMs: entry.mtimeMs });
   }
@@ -114,11 +122,22 @@ export function recentSessions(
 /** ファイルの先頭を返す（一覧に出す要約を作るため） */
 export const headOf = (path: string): string => readHead(path, DEEP_BYTES);
 
-/** その作業ディレクトリの会話を、ハーネスをまたいで新しい順に並べて返す */
-export function sessionsFor(cwd: string, roots: readonly string[] = defaultRoots()): string[] {
+/**
+ * その作業ディレクトリの会話を、ハーネスをまたいで新しい順に並べて返す。
+ * ここは**全部のファイル**を見る（どれが該当するか先に分からないため）。
+ * 1本32KB読むので、分かっているものは `knownCwd` で飛ばす——
+ * 実測（2026-08-29）で「続きから」が 3.4秒 かかっていたのはここ。
+ */
+export function sessionsFor(
+  cwd: string,
+  roots: readonly string[] = defaultRoots(),
+  knownCwd: KnownCwd = () => null,
+): string[] {
   const candidates = roots.flatMap((root) => jsonlUnder(root));
   candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  return candidates.filter((found) => cwdOf(found.path) === cwd).map((found) => found.path);
+  return candidates
+    .filter((found) => (knownCwd(found.path, found.mtimeMs) ?? cwdOf(found.path)) === cwd)
+    .map((found) => found.path);
 }
 
 /**
@@ -151,8 +170,9 @@ export function previousSessionsFor(
   cwd: string,
   env: Readonly<Record<string, string | undefined>> = process.env,
   roots: readonly string[] = defaultRoots(),
+  knownCwd: KnownCwd = () => null,
 ): string[] {
-  const all = sessionsFor(cwd, roots);
+  const all = sessionsFor(cwd, roots, knownCwd);
   const id = env["CLAUDE_CODE_SESSION_ID"];
   const self = id === undefined || id === "" ? null : findSessionById(roots, id);
   if (self !== null) return all.filter((path) => path !== self);

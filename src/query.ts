@@ -4,11 +4,12 @@
  * ここに画面への出力は書かない（MCPサーバーは標準出力がJSON-RPCで埋まっていて、
  * 1行でも余計に書くと通信が壊れる）。出すのは呼んだ側の仕事。
  */
+import { type Memory, load, remember, remembered, save } from "./cache.ts";
 import { type Listed, describe, pick } from "./list.ts";
 import { type Project, groupByProject, pickProject } from "./projects.ts";
 import { type BuiltContext, buildContext, buildContextFrom } from "./context.ts";
 import { readRepoSignals } from "./repo.ts";
-import { previousSessionsFor, recentSessions } from "./sessions.ts";
+import { type KnownCwd, defaultRoots, previousSessionsFor, recentSessions } from "./sessions.ts";
 
 /**
  * ファイル数で切ってはいけない。下請け（サブエージェント）の記録は桁違いに多く、
@@ -27,18 +28,60 @@ export const SCAN = 250;
 /** `--list` の既定件数。番号はこの一覧で数える */
 export const LIST_LIMIT = 15;
 
-/** 人が打った会話を、必要な数だけ新しい順に集める */
+/**
+ * 人が打った会話を、必要な数だけ新しい順に集める。
+ * 一度読んだ会話は覚えておく（更新時刻が同じなら読み直さない）。
+ * 読み直すと250本で4.7秒かかり、MCPから呼ぶたびにその待ちが乗る。
+ */
+/** 覚えている作業ディレクトリ。分からなければ null（そのときだけ読む） */
+const lookup =
+  (memory: Memory): KnownCwd =>
+  (path, mtimeMs) =>
+    remembered(memory, path, mtimeMs)?.cwd ?? null;
+
 export function humanSessions(limit: number, onlyCwd: string | null): Listed[] {
+  const memory = load();
+  const knownCwd = lookup(memory);
   const rows: Listed[] = [];
-  for (const entry of recentSessions(undefined, SCAN_LIMIT, onlyCwd)) {
-    const row = describe(entry);
+  let learned = false;
+  for (const entry of recentSessions(undefined, SCAN_LIMIT, onlyCwd, knownCwd)) {
+    const known = remembered(memory, entry.path, entry.mtimeMs);
+    const row = known ?? describe(entry);
+    if (known === null) {
+      remember(memory, entry.path, entry.mtimeMs, row);
+      learned = true;
+    }
     if (row.typed) rows.push(row);
     if (rows.length >= limit) break;
   }
+  if (learned) save(memory);
   return rows;
 }
 
 export const projectsOf = (): Project[] => groupByProject(humanSessions(SCAN, null));
+
+/**
+ * 本人の言葉で探す。「地図の話の続き」の"地図"がここに来る。
+ *
+ * 番号や ref を言わせないため。**打つのが苦手な人にとって、refを聞き返すのは
+ * コマンドを打たせているのと同じ**（本人の指摘 2026-08-29）。
+ *
+ * 見出しだけでなく発話の書き出しも見る。見出しが `(発話なし)`（スクショ1枚）や
+ * `github.com`（URLを貼っただけ）の会話は、見出しだけを見ていると
+ * **どんな言葉でも呼べない**（実測 2026-08-30）。
+ */
+const hits = (row: Listed, needle: string): boolean =>
+  row.topic.toLowerCase().includes(needle) ||
+  row.place.toLowerCase().includes(needle) ||
+  row.words.includes(needle);
+
+export function findByWords(words: string, limit = 6): Listed[] {
+  const needle = words.trim().toLowerCase();
+  if (needle === "") return [];
+  return humanSessions(SCAN, null)
+    .filter((row) => hits(row, needle))
+    .slice(0, limit);
+}
 
 /**
  * 選ぶ対象の会話たち。
@@ -76,6 +119,13 @@ export function chooseByKey(
 export const contextOf = (chosen: Listed, fallbackCwd: string): string | null =>
   buildContext(chosen.path, readRepoSignals(chosen.cwd ?? fallbackCwd));
 
-/** 自分ではない「直前の会話」。中身のある最初の1本を返す */
+/**
+ * 自分ではない「直前の会話」。中身のある最初の1本を返す。
+ * 「続きから」の本命の経路なので、覚えている分は読み飛ばす（3.4秒かかっていた）。
+ * 中身そのものは毎回読む——会話は続いているので、覚えたら古くなる。
+ */
 export const previousIn = (cwd: string): BuiltContext | null =>
-  buildContextFrom(previousSessionsFor(cwd), readRepoSignals(cwd));
+  buildContextFrom(
+    previousSessionsFor(cwd, process.env, defaultRoots(), lookup(load())),
+    readRepoSignals(cwd),
+  );

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   answerContext,
   answerConversations,
+  answerMatches,
   answerProjects,
   noPrevious,
   noSuchRef,
@@ -19,6 +20,7 @@ const session = (over: Partial<Listed> = {}): Listed => ({
   topic: "一覧の見出しが読めない",
   utterances: 42,
   typed: true,
+  words: "",
   ...over,
 });
 
@@ -70,5 +72,24 @@ describe("MCPが返す文面", () => {
 
   it("当たらない ref も失敗として返す", () => {
     expect(noSuchRef("deadbeef").ok).toBe(false);
+  });
+});
+
+describe("本人の言葉で探したとき", () => {
+  it("複数当たったら候補を返し、選ぶのはAIの仕事だと書く", () => {
+    const answer = answerMatches("地図", [session(), session({ ref: "0b11", topic: "地図の色" })]);
+    expect(answer.ok).toBe(true);
+    expect(answer.text).toContain("2本");
+    expect(answer.text).toContain("あなたが");
+  });
+
+  it("当たらなければ理由まで書く（言葉を変えれば済むと分かる）", () => {
+    const answer = answerMatches("ぜんぜん無い話", []);
+    expect(answer.ok).toBe(false);
+    expect(answer.text).toContain("見出しと置き場所");
+  });
+
+  it("一覧の締めくくりで、refを本人に聞き返すなと書く", () => {
+    expect(answerConversations(project(), "relay").text).toContain("聞き返さない");
   });
 });

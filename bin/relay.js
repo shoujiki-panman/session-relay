@@ -24,6 +24,6 @@ const ext = fromSource ? "ts" : "js";
 const args = process.argv.slice(2);
 const entry = args[0] === "mcp" ? "mcp-main" : "cli";
 // cli 側は先頭に「何をするか」を要求する。`relay --print` のように省かれたら足す
-if (entry === "cli" && args[0] !== "show") process.argv.splice(2, 0, "relay");
+if (entry === "cli" && !["show", "install"].includes(args[0])) process.argv.splice(2, 0, "relay");
 
 await import(pathToFileURL(join(dir, `${entry}.${ext}`)).href);

@@ -1,6 +1,7 @@
 /**
  * 会話を別スレッド／別ハーネスへ渡す。
  *   relay --projects [件数]             プロジェクト単位の一覧（選ぶ単位はこちらが既定）
+ *   relay --page [出力先]               一覧を1枚のHTMLにしてブラウザで開く
  *   relay --canvas [出力先]             プロジェクトと会話を .canvas に書き出す
  *   relay --pick [検索語] [--all]       その場で選ぶ（↑↓・打つと絞る・Enter・Esc）
  *   relay --list [件数] [--all] [--in <#|名前>]
@@ -12,8 +13,11 @@
  *   show <session.jsonl>                  射影の中身を確かめる
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
-import { toCanvas } from "./canvas.ts";
+import { readFileSync } from "node:fs";
+import { quitQuietlyOnBrokenPipe } from "./pipe.ts";
+import { USAGE, unknownArg, wantsHelp } from "./usage.ts";
+import { install } from "./install.ts";
+import { canvas, page, records } from "./exports.ts";
 import { groupByProject, pickProject, renderProjects } from "./projects.ts";
 import { buildContext } from "./context.ts";
 import { renderTable } from "./list.ts";
@@ -93,22 +97,6 @@ function listIn(key: string): number {
   }
   process.stdout.write(renderTable(chosen.sessions));
   process.stdout.write(`選ぶには: relay --from <#かref> --in ${key}\n`);
-  return 0;
-}
-
-/** プロジェクトと会話を .canvas に書き出す（画面は作らない。Obsidianが開く） */
-function canvas(outPath: string, limit: number): number {
-  const projects = projectsOf().slice(0, limit);
-  if (projects.length === 0) {
-    process.stderr.write("会話の記録が見つかりませんでした\n");
-    return 1;
-  }
-  writeFileSync(outPath, toCanvas(projects), "utf8");
-  const sessions = projects.reduce((total, row) => total + row.sessions.length, 0);
-  process.stderr.write(
-    `${outPath} に書き出しました（プロジェクト ${String(projects.length)} / 会話 ${String(sessions)}）\n` +
-      "ObsidianのVaultに置くと、そのままキャンバスとして開けます\n",
-  );
   return 0;
 }
 
@@ -220,7 +208,21 @@ function chooseMessage(usePrevious: boolean, from: string | null): string {
 
 const args = process.argv.slice(2);
 const command = args[0];
-if (command === "relay") {
+if (command === "install") {
+  process.exitCode = install(args.includes("--dry-run"));
+} else if (command === "relay") {
+  quitQuietlyOnBrokenPipe();
+  const rest = args.slice(1);
+  const unknown = unknownArg(rest);
+  if (wantsHelp(rest)) {
+    process.stdout.write(USAGE);
+    process.exit(0);
+  }
+  // 知らない言葉を読み飛ばすと、`relay --lst` が会話を起動する（実測で起動した）
+  if (unknown !== null) {
+    process.stderr.write(`知らない指定です: ${unknown}\n\n${USAGE}`);
+    process.exit(2);
+  }
   const toIndex = args.indexOf("--to");
   const target = toIndex >= 0 ? (args[toIndex + 1] ?? "claude") : "claude";
   const fromIndex = args.indexOf("--from");
@@ -230,6 +232,17 @@ if (command === "relay") {
   if (args.includes("--projects")) {
     const asked = Number(args[args.indexOf("--projects") + 1]);
     process.exitCode = listProjects(Number.isInteger(asked) && asked > 0 ? asked : 12);
+  } else if (args.includes("--records")) {
+    const given = args[args.indexOf("--records") + 1];
+    if (given === undefined || given.startsWith("--")) {
+      process.stderr.write("書き出す先を指定してください: relay --records <ディレクトリ>\n");
+      process.exitCode = 2;
+    } else {
+      process.exitCode = records(given, 12);
+    }
+  } else if (args.includes("--page")) {
+    const given = args[args.indexOf("--page") + 1];
+    process.exitCode = page(given === undefined || given.startsWith("--") ? null : given, 12);
   } else if (args.includes("--canvas")) {
     const given = args[args.indexOf("--canvas") + 1];
     const out = given === undefined || given.startsWith("--") ? "relay.canvas" : given;
@@ -260,6 +273,6 @@ if (command === "relay") {
 } else if (command === "show" && args[1] !== undefined) {
   process.exitCode = show(args[1]);
 } else {
-  process.stderr.write("使い方: relay --projects [件数] / relay --canvas [出力先] / relay --pick [検索語] [--all] / relay --list [件数] [--all] [--in <#|名前>] / relay [--to claude|codex] [--print] [--previous] [--from <#|ref>] / relay show <path>\n");
+  process.stderr.write(USAGE);
   process.exitCode = 2;
 }
