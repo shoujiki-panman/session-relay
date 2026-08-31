@@ -98,7 +98,7 @@
   - テスト**163件**緑（+22件）／厳格lint・strict型チェックも緑
 
 - [x] 🔌 **Phase 3: MCPサーバー**（2026-08-28）: 貼るのをやめ、**受け取る側のAIが自分で取りに来る**形にした
-  - `src/mcp.ts`（道具3つ＋プロンプト`resume`）／`src/mcp-answers.ts`（返す文面）／`relay mcp` で起動
+  - `src/mcp.ts`（当時の道具3つ＋プロンプト`resume`）／`src/mcp-answers.ts`（返す文面）／`relay mcp` で起動
   - 公式SDK（`@modelcontextprotocol/sdk` 1.30）を使う。KICKOFFの「公式の手順はそのまま再現する」に従った。**初めての依存**（それまで0）
   - `src/query.ts` を切り出した。CLIとMCPが**同じ探索処理**を使う（番号とrefの数え分けもここ）
   - **実測（本物のMCPクライアントで接続）**: `list_projects` 3.5秒/20件・`list_conversations` 2.8秒・`get_context` 引数なし **0.4秒/52KB**・当たらないrefは `isError` で返る
@@ -110,7 +110,7 @@
 - [x] 📦 **npmで配れる形にした**（2026-08-28）: 名前は **`@shoujiki-panman/session-relay`**（素の名前は `session-relay` / `relay-session` / `ai-relay` / `session-handoff` / `handoff-relay` すべて他人が使用中。スコープ付きなら名前を変えずに済む）
   - `npm run build`（`tsconfig.build.json`・`rewriteRelativeImportExtensions` で `./x.ts` → `./x.js`）／`bin/relay.js`（Windowsでも動く入口）／`files` は dist・bin・skills だけ
   - **`src` の `.ts` は配らない**。Nodeは `node_modules` の中では型を剥がさない（`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`）ので、TSのまま配ると入れた人の環境で動かない
-  - **実測**: `npm pack` → 別ディレクトリに install → `relay --projects` が動き、MCPも道具3つ・`get_context` 51KB/781ms・`list_projects` 3.5秒で返った
+  - **当時の実測**: `npm pack` → 別ディレクトリに install → `relay --projects` が動き、MCPも道具3つ・`get_context` 51KB/781ms・`list_projects` 3.5秒で返った
   - まだ **publish していない**（名前だけ決めた状態）
 
 - [x] 🐛 **プロジェクトの見出しが「(発話なし)」になっていたのを修正**（2026-08-28）
@@ -147,10 +147,30 @@
   - ⚠️ **画面が出るところは本人の確認待ち**。レコード160件・schema・ビューのコピーまでは確認したが、描画は見ていない
 - [x] テスト**211件**緑
 
+- [x] 📮 **スマホの普通のClaudeチャット用「投函口」をローカルで実証**（2026-08-31）
+  - Remote Controlではない普通のClaudeチャットはMacのJSONLに無く、従来のrelayから読めない。本人が「relayに預けて」と明示した会話だけを受ける境界を追加
+  - `relay mcp-deposit`: 外向き候補のMCP。見える道具は **`deposit_conversation` 1つだけ**。ローカル会話の一覧・読み取りは一切置かない
+  - `relay mcp`: Mac側に `list_deposits` / `get_deposit` を追加。refなしなら最新を読み、同じrelay文脈形式で本人の原文と直近の経過を返す
+  - 保存先は `~/.local/share/session-relay/inbox/`。ディレクトリ `0700`・ファイル `0600`、入力は1件64KB・全体256KB・発話200件まで。ファイル名はサーバー生成UUIDで、本人の題名をパスに使わない
+  - **本物のMCPクライアント2台で往復を実測**: 投函専用MCPへ原文2件を預ける → 通常MCPが最新を読み、2件とも原文のまま返した
+  - テスト**229件**緑（+8件）／lint・strict型チェック・buildも緑
+  - ⚠️ まだローカルstdioだけ。Claudeモバイル用の公開URL・Streamable HTTP・OAuthは作っていない。**認証なしで公開しない**
+
+- [x] 🔐 **投函口をHTTPにして、Cloudflare Accessの署名を自分でも検証するようにした**（2026-09-01）
+  - `relay mcp-deposit-http`（`src/deposit-http.ts` / `deposit-http-main.ts`）: Streamable HTTPの投函口。**127.0.0.1にしかbindしない**（外に出すのはCloudflare Tunnelの役目）
+  - `src/cloudflare-access.ts`: `Cf-Access-Jwt-Assertion` を **公開鍵（`/cdn-cgi/access/certs`）・issuer・audience** まで検証（`jose`）。**Accessを通っただけで信用しない**＝Tunnelの設定を誤って認証なしにしてもMCP本体が拒む
+  - チームドメイン（`SESSION_RELAY_ACCESS_TEAM_DOMAIN`）とAUD（`SESSION_RELAY_ACCESS_AUD`）が無ければ**起動しない**
+  - 🐛 **DNS rebindingのテストが実は何も試していなかった**: `fetch` では `Host` は禁止ヘッダーで**偽装できない**。403のつもりが406（Acceptヘッダー不足）で落ちていた＝middlewareまで届いていない。`node:http` の生リクエストに書き換え、「正しいHostなら403にならない」裏取りも足した（常に403になる作りだと緑になってしまう）
+  - 🐛 **SDK 1.30のNode版transportは strict型チェックを通らない**: `onclose` 等が `| undefined` 付きで宣言されていて、`exactOptionalPropertyTypes` の `Transport` に渡せない（clientの `sessionId` も同じ）。castは禁止しているので、その2行だけ `@ts-expect-error` に理由を書いた（**SDKが直ったらこの行がエラーになって気づける**）。ステートレスは `sessionIdGenerator: undefined` を渡す代わりに**キーを渡さない**形にした（実行時は同じ）
+  - **実測**: 本物のMCPクライアントでHTTP越しに接続 → 道具は `deposit_conversation` **1つだけ**・原文2件が保存・JWT無しは**403**・偽Hostは**403**。テスト**241件**緑／lint・strict型チェック・buildも緑
+  - **破壊テスト**: Access検証のmiddlewareを外すと1件red → 戻すと6件green
+  - ⚠️ **まだCloudflare側は触っていない**。Tunnelを張る・AccessアプリとAUDを作る・Claudeモバイルのカスタムコネクタに登録する、は未実施
+
 ## 🔨 いまやっていること
 - MulmoTerminalで「会話の続き」を開いて、タップ→下書き→送信 が通るかを**本人が**確かめる
 - Codexの**対話TUI**で「続きから」→ MCP承認 → 現在地が答えられるかを確かめる（headlessは落ちる・上の⚠️）
 - publish するかどうか（名前は決めた・まだ出していない）
+- スマホ投函口はMac側（HTTP＋Access署名検証）まで出来た。次は**Cloudflare側**（Tunnel・Accessアプリ・AUD）を作って、Claudeモバイルのカスタムコネクタから「この会話をrelayに預けて」を実機で確かめる
 
 ## ⚠️ いまの限界（分かっていて残していること）
 - gitの欄は**relayを打ったディレクトリ**のリポジトリを映す。会話の話題と別のリポジトリのことがある

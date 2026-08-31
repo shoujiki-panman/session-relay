@@ -22,6 +22,7 @@ import {
 } from "./mcp-answers.ts";
 import { pickProject } from "./projects.ts";
 import { chooseByKey, contextOf, findByWords, previousIn, projectsOf } from "./query.ts";
+import { type Deposit, type Inbox, createInbox, renderDeposit } from "./inbox.ts";
 
 /** SDKが受け取る形。書き換え可の配列＋追加項目を許す形でないと通らない */
 interface ToolResult {
@@ -115,6 +116,61 @@ function addListTools(server: McpServer): void {
   );
 }
 
+const depositLine = (deposit: Deposit): string =>
+  `- ref ${deposit.id} | ${deposit.createdAt} | ${deposit.source} | ${deposit.title}`;
+
+function addDepositListTool(server: McpServer, inbox: Inbox): void {
+  server.registerTool(
+    "list_deposits",
+    {
+      title: "預けた会話の一覧",
+      description:
+        "Claudeモバイル等で『relayに預けて』と明示して保存した会話を新しい順に返す。" +
+        "本人が『スマホで預けた話』と言ったときに使う。",
+      inputSchema: {},
+    },
+    () => {
+      const rows = inbox.list();
+      return reply({
+        ok: rows.length > 0,
+        text:
+          rows.length === 0
+            ? "預けられた会話はありません。"
+            : ["預けられた会話（新しい順）:", ...rows.map(depositLine), "", "読むには get_deposit にrefを渡す。"].join(
+                "\n",
+              ),
+      });
+    },
+  );
+}
+
+function addDepositReadTool(server: McpServer, inbox: Inbox): void {
+  server.registerTool(
+    "get_deposit",
+    {
+      title: "スマホ等から預けた会話を引き継ぐ",
+      description:
+        "本人が別のClaudeチャットから預けた会話を原文のまま返す。ref省略時は最新。" +
+        "『スマホで預けた続き』『さっき預けた話』なら、本人にrefを聞かずまず引数なしで呼ぶ。",
+      inputSchema: { ref: z.string().optional().describe("list_depositsが返したref。省略すると最新") },
+    },
+    ({ ref }) => {
+      const found = inbox.get(ref);
+      return reply(
+        found === null
+          ? { ok: false, text: "預けられた会話が見つかりません。list_depositsで確認してください。" }
+          : { ok: true, text: renderDeposit(found) },
+      );
+    },
+  );
+}
+
+/** 外から明示的に預けた会話を読む。外向きの投函MCPとはサーバーごと分ける。 */
+function addInboxTools(server: McpServer, inbox: Inbox): void {
+  addDepositListTool(server, inbox);
+  addDepositReadTool(server, inbox);
+}
+
 /** 「続きから」を、この人が選べる形でも出しておく（Claude Codeでは /mcp のメニューに出る） */
 function addResumePrompt(server: McpServer): void {
   server.registerPrompt(
@@ -134,10 +190,11 @@ function addResumePrompt(server: McpServer): void {
   );
 }
 
-export function createServer(): McpServer {
+export function createServer(inbox: Inbox = createInbox()): McpServer {
   const server = new McpServer({ name: "relay", version: "0.1.0" });
   addContextTool(server);
   addListTools(server);
+  addInboxTools(server, inbox);
   addResumePrompt(server);
   return server;
 }

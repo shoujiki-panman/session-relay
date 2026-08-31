@@ -4,6 +4,8 @@
  *   relay [--to codex] [--print] [--previous] [--from <#|ref>]
  *   relay --projects / --list / --pick / --canvas
  *   relay mcp                 MCPサーバーとして話す（AIが自分で取りに来る側）
+ *   relay mcp-deposit         会話を預けるだけのMCP（外向き候補）
+ *   relay mcp-deposit-http    Cloudflare Access必須のリモート投函口
  *   relay show <session.jsonl>
  *
  * **手元に src があれば src を読む。** 配布物には src が入っていない（package.json の
@@ -22,7 +24,14 @@ const dir = join(here, "..", fromSource ? "src" : "dist");
 const ext = fromSource ? "ts" : "js";
 
 const args = process.argv.slice(2);
-const entry = args[0] === "mcp" ? "mcp-main" : "cli";
+const entry =
+  args[0] === "mcp"
+    ? "mcp-main"
+    : args[0] === "mcp-deposit"
+      ? "deposit-mcp-main"
+      : args[0] === "mcp-deposit-http"
+        ? "deposit-http-main"
+        : "cli";
 // cli 側は先頭に「何をするか」を要求する。`relay --print` のように省かれたら足す
 if (entry === "cli" && !["show", "install"].includes(args[0])) process.argv.splice(2, 0, "relay");
 

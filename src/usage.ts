@@ -22,6 +22,8 @@ export const USAGE = `会話を別スレッド／別ハーネスへ渡す
   relay --records <場所>     一覧を1会話＝1ファイルで書き出す（画面から選ぶ用）
 
   relay mcp                  MCPサーバーとして話す（AIが自分で取りに来る）
+  relay mcp-deposit          会話を預けるだけのMCP（ローカル会話は読めない）
+  relay mcp-deposit-http     Cloudflare Access必須のHTTP投函口（127.0.0.1限定）
   relay install [--dry-run]  MCPとスキルをまとめて登録する
   relay show <path>          射影の中身を確かめる
 `;

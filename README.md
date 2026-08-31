@@ -177,15 +177,53 @@ claude mcp add relay --scope user -- /絶対パス/bin/relay.js mcp
 codex mcp add relay -- /絶対パス/bin/relay.js mcp
 ```
 
-道具は3つ。AIは上から順に降りてこられる。
+通常のMCPに見える道具は5つ。AIは上から順に降りてこられる。
 
 | 道具 | 何をするか |
 |---|---|
 | `get_context` | 前の会話を原文のまま返す。**引数なし**＝いまいる場所の直前の会話 |
 | `list_projects` | プロジェクト単位の一覧（どの話の続きかを選ばせるとき） |
 | `list_conversations` | そのプロジェクトの会話と `ref` |
+| `list_deposits` | スマホ等から明示的に預けた会話の一覧 |
+| `get_deposit` | ref指定、または指定なしで最新の預けた会話を返す |
 
 `ref` を必ず書いて返している。書かないと、AIはもう一度自分で探しに行く。
+
+### スマホの普通のClaudeチャットから預ける（ローカル実証）
+
+Claude CodeのRemote Controlではなく、Claudeアプリで普通に始めた会話は
+`~/.claude` に記録されないため、従来のrelayからは見えない。そこで、本人が
+「この会話をrelayに預けて」と明示した会話だけを受け取る投函口を分けた。
+
+```sh
+relay mcp-deposit
+```
+
+このMCPに見える道具は `deposit_conversation` **1つだけ**。ローカルの会話を
+一覧・閲覧する道具は置かない。預けた内容は
+`~/.local/share/session-relay/inbox/` にディレクトリ `0700`・ファイル `0600` で保存する。
+
+外向きにはこの書き込み専用MCPだけを出し、通常の `relay mcp` はローカルから出さない。
+
+### 外から預ける（Cloudflare Tunnel + Access）
+
+同じ投函口を、Streamable HTTPでCloudflare Tunnelの後ろに置ける。
+
+```sh
+export SESSION_RELAY_ACCESS_TEAM_DOMAIN=https://<team>.cloudflareaccess.com
+export SESSION_RELAY_ACCESS_AUD=<AccessアプリケーションのAudience Tag>
+relay mcp-deposit-http          # http://127.0.0.1:8788/mcp（127.0.0.1にしかbindしない）
+```
+
+- **チームドメインとAUDが無ければ起動しない。** 認証なしのまま公開URLに繋がる状態を作らせない
+- 受信時も `Cf-Access-Jwt-Assertion` をCloudflareの公開鍵（`/cdn-cgi/access/certs`）・issuer・audienceまで
+  検証する。**Tunnelの設定を間違えても、MCP本体が拒否する**（Accessを通っただけで信用しない）
+- `Host` が localhost 系でなければ拒否（DNS rebinding対策）。ポートは `SESSION_RELAY_DEPOSIT_PORT`
+- 見える道具は stdio 版と同じく `deposit_conversation` **1つだけ**
+
+**実証したのはここまで**（2026-09-01）: 本物のMCPクライアントでHTTP越しに接続し、道具1つ・原文の保存・
+JWTが無い要求を403・偽のHostを403、まで確認した。**まだCloudflare Tunnelを実際に張って
+Claudeモバイルのカスタムコネクタから預けたことは無い。**
 
 **標準出力はJSON-RPCで埋まっている。** 何かを知らせたいときは stderr に書くこと——
 1行でも標準出力に混ざると通信が壊れる。

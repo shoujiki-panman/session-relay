@@ -25,11 +25,13 @@ afterAll(async () => {
   await client.close();
 });
 
-it("stdioで繋がって、3つの道具が見える", async () => {
+it("stdioで繋がって、通常の会話と預けた会話を読む5つの道具が見える", async () => {
   const { tools } = await client.listTools();
   expect(tools.map((tool) => tool.name).sort()).toEqual([
     "get_context",
+    "get_deposit",
     "list_conversations",
+    "list_deposits",
     "list_projects",
   ]);
 });
@@ -38,6 +40,12 @@ it("get_context は引数なしで呼べる（「続きから」がそのまま�
   const { tools } = await client.listTools();
   const context = tools.find((tool) => tool.name === "get_context");
   expect(context?.inputSchema.required ?? []).toEqual([]);
+});
+
+it("get_deposit はrefなしで最新を読める", async () => {
+  const { tools } = await client.listTools();
+  const deposit = tools.find((tool) => tool.name === "get_deposit");
+  expect(deposit?.inputSchema.required ?? []).toEqual([]);
 });
 
 it("「続きから」がプロンプトとしても出ている", async () => {
