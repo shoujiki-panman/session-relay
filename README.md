@@ -18,7 +18,7 @@
 本人が「relayに預けて」と明示したときだけ、書き込み専用のリモートMCPから自分のMacへ預けられます。
 作った経緯は[Zenn記事](https://zenn.dev/shoujiki_panman/articles/session-relay-no-handoff)にまとめました。
 
-> **配布状況（2026-09-01）**: GitHubから利用できます。npm packageはまだ公開していません。
+> **配布状況（2026-09-02更新）**: npmで公開済みです。
 > 作者が運営する共有サーバーはありません。モバイル投函口は各利用者が自分のCloudflareとMacへ
 > セルフホストします。
 
@@ -27,13 +27,12 @@
 Node.js 20以降が必要です。現在の実機確認はmacOSで行っています。
 
 ```sh
-git clone https://github.com/shoujiki-panman/session-relay.git
-cd session-relay
-npm ci
-npm run build
-npm link
+npm install -g @shoujiki-panman/session-relay
 relay install
 ```
+
+git cloneで開発版を使う場合は、`bin/relay.js` が `src/` の `.ts` を直接読むため
+**Node.js 22.18以降**が要ります（npm版はビルド済みの `dist/` を使うので20で動きます）。
 
 新しいClaude Code／Codexの会話で、次のように話しかけます。
 
@@ -82,10 +81,10 @@ relay install
 ## 使うには
 
 ```sh
-# npm公開前
-git clone https://github.com/shoujiki-panman/session-relay.git
-cd session-relay && npm ci && npm run build && npm link
+npm install -g @shoujiki-panman/session-relay   # relay コマンドが入る
 ```
+
+開発版はcloneして `npm ci`（この場合はNode 22.18以降）。
 
 手元で開発するならcloneして `npm ci`。`npm link` の代わりに
 `ln -s "$PWD/bin/relay" ~/.local/bin/relay` でもよい。
@@ -307,7 +306,7 @@ JWTなし・無効JWT・偽Hostを403で拒否した。外向きに見える道�
 - [x] **Phase 3** MCPサーバー（AIが自分で取りに来る）。Claude Code で接続を確認
 - [x] **Phase 3.5** ClaudeモバイルからCloudflare Access経由でMacへ預け、Codex側から読めることを実機確認
 - [ ] Codexの対話TUIで「続きから」が通ることの確認（headlessは承認で落ちる）
-- [ ] npm配布（名前は `@shoujiki-panman/session-relay`。公開前のtarball検証まで実施）
+- [x] npm配布（2026-09-01公開・`@shoujiki-panman/session-relay` 0.2.0）
 - [ ] リモート投函口の常駐化と認証済み利用者ごとのレート制限
 - [ ] 索引（複数の会話から探して引く）
 
