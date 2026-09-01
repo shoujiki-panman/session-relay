@@ -207,6 +207,10 @@
   - テスト**248件**緑（+5）／破壊テスト済み（synthetic_reason無視→1件red→戻すと緑）
   - ⚠️ **実機サンプル未検証**（Grok Buildは有料ログインが要る）。一覧・「続きから」への統合は、実物の記録で答え合わせしてから（fixtureは公式のserde定義から起こした）
 
+- [x] 🩺 **`relay doctor` を追加**（2026-09-02）: MCP登録（claude/codex）・スキル・投函口の生存を1コマンドで検査。「繋がらない」の切り分け用
+  - 入っているハーネスだけ検査／投函口は使っている人（inboxか設定がある人）だけ検査／実環境で全項目✅を実測
+  - テスト**251件**緑（+3・tmpホームと使い捨てHTTPサーバーで生死まで実測）
+
 ## 🔨 いまやっていること（公開の残り）
 - [x] tarball実機テスト → GitHubへコミット・push
 - [x] Zenn記事published（2026-09-01）: https://zenn.dev/shoujiki_panman/articles/session-relay-no-handoff ／READMEも読者の場面から始まる構成に改稿

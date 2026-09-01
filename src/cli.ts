@@ -19,6 +19,7 @@ import { quitQuietlyOnBrokenPipe } from "./pipe.ts";
 import { USAGE, unknownArg, wantsHelp } from "./usage.ts";
 import { install } from "./install.ts";
 import { runDeposits } from "./deposits-cli.ts";
+import { runDoctor } from "./doctor.ts";
 import { canvas, page, records } from "./exports.ts";
 import { groupByProject, pickProject, renderProjects } from "./projects.ts";
 import { buildContext } from "./context.ts";
@@ -279,6 +280,8 @@ if (command === "install") {
   }
 } else if (command === "deposits") {
   process.exitCode = runDeposits(args.slice(1));
+} else if (command === "doctor") {
+  process.exitCode = await runDoctor();
 } else if (command === "show" && args[1] !== undefined) {
   process.exitCode = show(args[1]);
 } else {

@@ -26,6 +26,7 @@ export const USAGE = `会話を別スレッド／別ハーネスへ渡す
   relay mcp-deposit          会話を預けるだけのMCP（ローカル会話は読めない）
   relay mcp-deposit-http     Cloudflare Access必須のHTTP投函口（127.0.0.1限定）
   relay install [--dry-run]  MCPとスキルをまとめて登録する
+  relay doctor               登録と生存を1コマンドで検査する（繋がらない時に）
   relay show <path>          射影の中身を確かめる
 `;
 
