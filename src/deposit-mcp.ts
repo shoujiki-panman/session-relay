@@ -20,7 +20,7 @@ const errorText = (error: unknown): string =>
   error instanceof Error && !("code" in error) ? error.message : "保存に失敗しました";
 
 export function createDepositServer(inbox: Inbox = createInbox()): McpServer {
-  const server = new McpServer({ name: "relay-deposit", version: "0.2.1" });
+  const server = new McpServer({ name: "relay-deposit", version: "0.2.2" });
   server.registerTool(
     "deposit_conversation",
     {

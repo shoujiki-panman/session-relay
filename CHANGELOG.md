@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2 - 2026-09-02
+
+- `relay deposits`（受信箱の一覧）と `relay deposits rm <ref>`（削除）を追加
+- 常駐化の手順とlaunchdテンプレを同梱（docs/remote-mcp-ja.md・examples/launchd/）
+
 ## 0.2.1 - 2026-09-02
 
 - セキュリティレビュー（重大0・中1・軽微2）の指摘を修正
