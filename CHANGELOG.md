@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3 - 2026-09-02
+
+- `relay doctor`: MCP登録・スキル・投函口の生存を1コマンドで検査
+- `relay deposits` / `relay deposits rm <ref>`: 受信箱の一覧と削除
+- Grok Build CLIの記録（chat_history.jsonl）を射影できるようになった（第一段・実機検証待ち）
+
 ## 0.2.2 - 2026-09-02
 
 - `relay deposits`（受信箱の一覧）と `relay deposits rm <ref>`（削除）を追加
