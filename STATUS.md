@@ -182,7 +182,9 @@
 - [x] tarball実機テスト → GitHubへコミット・push
 - [x] Zenn記事published（2026-09-01）: https://zenn.dev/shoujiki_panman/articles/session-relay-no-handoff ／READMEも読者の場面から始まる構成に改稿
 - [x] npm publish 0.2.0（2026-09-01）: `@shoujiki-panman/session-relay`。🐛アカウント名は `shojikipanman`（ハイフン無し）でscope不一致→npm組織 `shoujiki-panman` をFreeで新設して解決
-- 記事への実機スクショ掲載は本人判断でなし（会話の中身が見えるため）
+- 記事への実機スクショ掲載は本人判断でなし（会話の中身が見えるため）。デモ動画も作ったが本人判定で不採用→デモ用の偽会話ごと削除済み
+- [x] X告知（2026-09-02・正直パンマン名義）: 「枠はツールごとに別」を編集で補記。BootCamp Slackにも共有
+- 📊 使われ方の数字は npm DL（1日遅れ）／GitHub star・clone（cloneはbot混じり）／Zennいいね／Xアナリティクスで見る。公開直後実測: clone 25/uniq 19・star 0
 - MulmoTerminalで「会話の続き」を開いて、タップ→下書き→送信 が通るかを**本人が**確かめる
 - Codexの**対話TUI**で「続きから」→ MCP承認 → 現在地が答えられるかを確かめる（headlessは落ちる・上の⚠️）
 - 投函口サーバー＋Tunnelの**常駐化**（いまは手動起動。Macを再起動すると止まる）と、利用者ごとのレート制限
