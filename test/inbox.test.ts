@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdtempSync } from "node:fs";
 import { afterEach, expect, it } from "vitest";
-import { createInbox, renderDeposit } from "../src/inbox.ts";
+import { createInbox, renderDeposit, MAX_DEPOSITS } from "../src/inbox.ts";
 import { parseRelayContext } from "../src/relay-block.ts";
 
 const roots: string[] = [];
@@ -86,4 +86,16 @@ it("壊れたファイルと想定外の名前を一覧から無視する", () =
   writeFileSync(join(dir, "00000000-0000-4000-8000-000000000000.json"), "壊れたJSON");
   writeFileSync(join(dir, "not-a-deposit.json"), JSON.stringify({ shape: 1 }));
   expect(createInbox(dir).list()).toEqual([]);
+});
+
+it("受信箱の上限を超える投函を拒む（ディスク食い潰し対策）", () => {
+  const { dir } = fixture();
+  const full = createInbox(dir);
+  for (let i = 0; i < MAX_DEPOSITS; i += 1) {
+    full.put({ title: `t${String(i)}`, source: "claude-web", userMessages: ["a"], progress: [] });
+  }
+  expect(() => full.put({ title: "over", source: "claude-web", userMessages: ["b"], progress: [] })).toThrow(
+    /いっぱい/,
+  );
+  expect(full.list().length).toBe(MAX_DEPOSITS);
 });

@@ -15,7 +15,9 @@ const reply = (text: string, ok = true): ToolResult => ({
   ...(ok ? {} : { isError: true }),
 });
 
-const errorText = (error: unknown): string => (error instanceof Error ? error.message : "保存に失敗しました");
+/** 自作の検証メッセージだけ返す。fs系エラー（codeを持つ）はパスが混ざるので固定文言に落とす */
+const errorText = (error: unknown): string =>
+  error instanceof Error && !("code" in error) ? error.message : "保存に失敗しました";
 
 export function createDepositServer(inbox: Inbox = createInbox()): McpServer {
   const server = new McpServer({ name: "relay-deposit", version: "0.2.0" });

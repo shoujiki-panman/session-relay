@@ -50,7 +50,7 @@ export function createDepositHttpApp(options: DepositHttpOptions): express.Expre
   app.disable("x-powered-by");
   app.use(localhostHostValidation());
   app.get("/healthz", (_request, response) => {
-    response.json({ ok: true, tools: ["deposit_conversation"] });
+    response.json({ ok: true });
   });
   app.use("/mcp", requireAccess(options.verifyAccess));
   app.use("/mcp", express.json({ limit: "1mb" }));

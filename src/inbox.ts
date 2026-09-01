@@ -147,10 +147,23 @@ function readAll(dir: string): Deposit[] {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/** 受信箱に貯められる件数の上限。認証を持つ相手にもディスクは食い潰させない */
+export const MAX_DEPOSITS = 100;
+
+const countDeposits = (dir: string): number => {
+  try {
+    return readdirSync(dir).filter((name) => FILE_NAME.test(name)).length;
+  } catch {
+    return 0;
+  }
+};
+
 export function createInbox(dir: string = defaultInboxDir(), identity: Identity = realIdentity): Inbox {
   return {
     put: (given) => {
       const input = normalize(given);
+      if (countDeposits(dir) >= MAX_DEPOSITS)
+        throw new Error(`受信箱がいっぱいです（${String(MAX_DEPOSITS)}件）。読み終えた投函を消してから預けてください`);
       mkdirSync(dir, { recursive: true, mode: 0o700 });
       chmodSync(dir, 0o700);
       const deposit = { ...input, shape: SHAPE, id: identity.id(), createdAt: identity.now() };
