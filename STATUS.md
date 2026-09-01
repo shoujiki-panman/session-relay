@@ -180,8 +180,9 @@
 
 ## 🔨 いまやっていること（公開の残り）
 - [x] tarball実機テスト → GitHubへコミット・push
-- [ ] Zenn記事の下書き（published: false・実体験中心）→ 本人確認後にpublish
-- [ ] npm publish 0.2.0（**本人の `npm login` が要る**）
+- [x] Zenn記事published（2026-09-01）: https://zenn.dev/shoujiki_panman/articles/session-relay-no-handoff ／READMEも読者の場面から始まる構成に改稿
+- [x] npm publish 0.2.0（2026-09-01）: `@shoujiki-panman/session-relay`。🐛アカウント名は `shojikipanman`（ハイフン無し）でscope不一致→npm組織 `shoujiki-panman` をFreeで新設して解決
+- 記事への実機スクショ掲載は本人判断でなし（会話の中身が見えるため）
 - MulmoTerminalで「会話の続き」を開いて、タップ→下書き→送信 が通るかを**本人が**確かめる
 - Codexの**対話TUI**で「続きから」→ MCP承認 → 現在地が答えられるかを確かめる（headlessは落ちる・上の⚠️）
 - 投函口サーバー＋Tunnelの**常駐化**（いまは手動起動。Macを再起動すると止まる）と、利用者ごとのレート制限
