@@ -99,3 +99,16 @@ it("受信箱の上限を超える投函を拒む（ディスク食い潰し対�
   );
   expect(full.list().length).toBe(MAX_DEPOSITS);
 });
+
+it("refで1件に絞れたときだけ投函を消す", () => {
+  const { dir } = fixture();
+  const box = createInbox(dir);
+  const a = box.put({ title: "消す方", source: "claude-web", userMessages: ["a"], progress: [] });
+  box.put({ title: "残す方", source: "claude-web", userMessages: ["b"], progress: [] });
+
+  expect(box.remove("")).toBeNull(); // 空refで全消しさせない
+  expect(box.remove("zzzz")).toBeNull(); // 当たらない
+  const removed = box.remove(a.id.slice(0, 8));
+  expect(removed?.title).toBe("消す方");
+  expect(box.list().map((d) => d.title)).toEqual(["残す方"]);
+});

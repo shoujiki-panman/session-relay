@@ -5,7 +5,7 @@
  * 読み出すのはMac上の通常MCPに分ける。
  */
 import { randomUUID } from "node:crypto";
-import {
+import { rmSync,
   chmodSync,
   lstatSync,
   mkdirSync,
@@ -53,6 +53,7 @@ export interface Inbox {
   readonly put: (input: DepositInput) => Deposit;
   readonly list: () => Deposit[];
   readonly get: (ref?: string) => Deposit | null;
+  readonly remove: (ref: string) => Deposit | null;
 }
 
 interface Identity {
@@ -180,6 +181,14 @@ export function createInbox(dir: string = defaultInboxDir(), identity: Identity 
       if (ref === undefined || ref === "") return rows[0] ?? null;
       const matches = rows.filter((item) => item.id.startsWith(ref));
       return matches.length === 1 ? (matches[0] ?? null) : null;
+    },
+    remove: (ref) => {
+      if (ref === "") return null;
+      const matches = readAll(dir).filter((item) => item.id.startsWith(ref));
+      const hit = matches.length === 1 ? matches[0] : undefined;
+      if (hit === undefined) return null;
+      rmSync(join(dir, `${hit.id}.json`));
+      return hit;
     },
   };
 }

@@ -21,6 +21,7 @@ export const USAGE = `会話を別スレッド／別ハーネスへ渡す
   relay --canvas [出力先]    プロジェクトと会話を .canvas に書き出す
   relay --records <場所>     一覧を1会話＝1ファイルで書き出す（画面から選ぶ用）
 
+  relay deposits [rm <ref>]  スマホ等から預けられた会話の一覧／削除
   relay mcp                  MCPサーバーとして話す（AIが自分で取りに来る）
   relay mcp-deposit          会話を預けるだけのMCP（ローカル会話は読めない）
   relay mcp-deposit-http     Cloudflare Access必須のHTTP投函口（127.0.0.1限定）

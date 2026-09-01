@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 import { quitQuietlyOnBrokenPipe } from "./pipe.ts";
 import { USAGE, unknownArg, wantsHelp } from "./usage.ts";
 import { install } from "./install.ts";
+import { runDeposits } from "./deposits-cli.ts";
 import { canvas, page, records } from "./exports.ts";
 import { groupByProject, pickProject, renderProjects } from "./projects.ts";
 import { buildContext } from "./context.ts";
@@ -270,6 +271,8 @@ if (command === "install") {
       inKey,
     );
   }
+} else if (command === "deposits") {
+  process.exitCode = runDeposits(args.slice(1));
 } else if (command === "show" && args[1] !== undefined) {
   process.exitCode = show(args[1]);
 } else {

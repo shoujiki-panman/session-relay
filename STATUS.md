@@ -195,6 +195,11 @@
   - 手順とテンプレは docs/remote-mcp-ja.md と examples/launchd/ に公開
   - ⚠️ ユーザーLaunchAgentなので**ログイン中だけ**動く。蓋閉じ運用はCapsomnia前提のまま
 
+- [x] 🧹 **受信箱の掃除コマンド（Issue #2）**（2026-09-02）: `relay deposits`（一覧）／`relay deposits rm <ref>`（削除）
+  - 空refでの全消し防止・曖昧refは拒否。テスト**243件**緑
+  - 🐛 bin/relay.js の入口が新サブコマンドを素通しせず「relay」扱いにする作り。サブコマンドを足すときは**binの許可リストにも足す**（今回踏んだ）
+  - ⚠️ npm 0.2.1には未収録。次のpublish（0.2.2）でまとめて反映
+
 ## 🔨 いまやっていること（公開の残り）
 - [x] tarball実機テスト → GitHubへコミット・push
 - [x] Zenn記事published（2026-09-01）: https://zenn.dev/shoujiki_panman/articles/session-relay-no-handoff ／READMEも読者の場面から始まる構成に改稿

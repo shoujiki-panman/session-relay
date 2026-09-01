@@ -249,7 +249,8 @@ relay mcp-deposit
 
 このMCPに見える道具は `deposit_conversation` **1つだけ**。ローカルの会話を
 一覧・閲覧する道具は置かない。預けた内容は
-`~/.local/share/session-relay/inbox/` にディレクトリ `0700`・ファイル `0600` で保存する。
+`~/.local/share/session-relay/inbox/` にディレクトリ `0700`・ファイル `0600` で保存する
+（上限100件）。届いた投函の一覧と削除は `relay deposits` ／ `relay deposits rm <ref>`。
 
 外向きにはこの書き込み専用MCPだけを出し、通常の `relay mcp` はローカルから出さない。
 
