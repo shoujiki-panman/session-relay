@@ -203,3 +203,21 @@ relayの最新の続き
 消すCLIはまだありません。削除するときは対象のUUIDファイルを自分で確認してから扱ってください。
 
 脅威モデルと既知の限界は [`SECURITY.md`](../SECURITY.md) にまとめています。
+
+## 常駐化（Macを再起動しても投函口が開いたままにする）
+
+手で起動したサーバーとTunnelは、再起動で黙って止まる。launchdに任せる。
+
+1. 投函口サーバー: [`examples/launchd/com.example.relay-deposit.plist`](../examples/launchd/com.example.relay-deposit.plist)
+   を自分の値に書き換えて `~/Library/LaunchAgents/` に置き、
+   `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/<ファイル名>`。
+   AUDは秘密ではないが、plistは `chmod 600` にしておく
+2. Tunnel: 公式の `cloudflared service install` を使う。ただし**生成されるplistには
+   `tunnel run` の引数が入っておらず、そのままだと空振りで再起動を繰り返す**（実測）。
+   `~/Library/LaunchAgents/com.cloudflare.cloudflared.plist` の `ProgramArguments` を
+   `[cloudflared, tunnel, run, <トンネル名>]` に直してから読み込み直す
+3. 検証: プロセスを `kill` しても数秒で復活すること（`KeepAlive`）と、
+   `cloudflared tunnel info <トンネル名>` にコネクタが載ることを確認する
+
+どちらもユーザーのLaunchAgentなので、**ログインしている間だけ**動く。
+蓋を閉じて寝かせない設定（電源接続＋スリープ防止）は別途必要。

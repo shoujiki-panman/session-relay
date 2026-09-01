@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- 投函口サーバーの常駐化。<...>を自分の値に置き換え、
+     ~/Library/LaunchAgents/ に置いて launchctl bootstrap gui/$(id -u) <このファイル> -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.example.relay-deposit</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/absolute/path/to/node</string>
+    <string>/absolute/path/to/session-relay/bin/relay.js</string>
+    <string>mcp-deposit-http</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>SESSION_RELAY_ACCESS_TEAM_DOMAIN</key><string>https://&lt;team&gt;.cloudflareaccess.com</string>
+    <key>SESSION_RELAY_ACCESS_AUD</key><string>&lt;AccessアプリのAudience Tag&gt;</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/&lt;you&gt;/.local/share/session-relay/logs/deposit-http.log</string>
+  <key>StandardErrorPath</key><string>/Users/&lt;you&gt;/.local/share/session-relay/logs/deposit-http.log</string>
+</dict>
+</plist>

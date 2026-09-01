@@ -189,6 +189,12 @@
   - 残存リスクとして記録: 預けた本文経由のプロンプトインジェクション（構造面は防御済み・読む側LLMの追従は原理的に残る）
   - 投函口サーバーは修正版で再起動済み
 
+- [x] 🔁 **投函口の常駐化（Issue #1）**（2026-09-02）: サーバーとTunnelをlaunchd管理に
+  - サーバー: `~/Library/LaunchAgents/com.shoujiki-panman.relay-deposit.plist`（KeepAlive・環境変数内蔵・600）。**killしても数秒で自動復活を実測**
+  - Tunnel: 公式 `cloudflared service install` を使用。🐛**生成plistに `tunnel run` の引数が無く空振りループ**（実測）→ ProgramArgumentsに追記して解決。エッジ4本接続を確認
+  - 手順とテンプレは docs/remote-mcp-ja.md と examples/launchd/ に公開
+  - ⚠️ ユーザーLaunchAgentなので**ログイン中だけ**動く。蓋閉じ運用はCapsomnia前提のまま
+
 ## 🔨 いまやっていること（公開の残り）
 - [x] tarball実機テスト → GitHubへコミット・push
 - [x] Zenn記事published（2026-09-01）: https://zenn.dev/shoujiki_panman/articles/session-relay-no-handoff ／READMEも読者の場面から始まる構成に改稿
