@@ -1,5 +1,7 @@
 # session-relay
 
+[![CI](https://github.com/shoujiki-panman/session-relay/actions/workflows/ci.yml/badge.svg)](https://github.com/shoujiki-panman/session-relay/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/%40shoujiki-panman%2Fsession-relay)](https://www.npmjs.com/package/@shoujiki-panman/session-relay)
+
 **AIとの会話を、引き継ぎ書を書かずに別のスレッド／別のハーネスへそのまま移す。**
 
 会話が利用制限で止まったら、新しいチャットに「**続きから**」と打つだけ。
