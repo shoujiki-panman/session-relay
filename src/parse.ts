@@ -48,10 +48,20 @@ export function classifyUtterance(text: string): UtteranceKind {
  * 中身からハーネスを判定する。
  * Claude Codeは各行が sessionId を持ち、Codexは payload を持つ。
  */
+const GROK_TYPES = new Set(["user", "assistant", "tool_result", "system", "backend_tool_call", "reasoning"]);
+
 export function detectHarness(rows: readonly Row[]): Harness | null {
   for (const row of rows) {
     if (typeof row["sessionId"] === "string") return "claude-code";
     if (isRecord(row["payload"])) return "codex";
+    // Grokのchat_history.jsonl: sessionId/payloadを持たず、typeがConversationItemのタグ
+    if (
+      typeof row["type"] === "string" &&
+      GROK_TYPES.has(row["type"]) &&
+      row["message"] === undefined &&
+      "content" in row
+    )
+      return "grok";
   }
   return null;
 }

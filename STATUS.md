@@ -200,6 +200,13 @@
   - 🐛 bin/relay.js の入口が新サブコマンドを素通しせず「relay」扱いにする作り。サブコマンドを足すときは**binの許可リストにも足す**（今回踏んだ）
   - ✅ npm 0.2.2として公開済み（2026-09-02・Release v0.2.2）
 
+- [x] 🤖 **Grok Build CLI対応・第一段**（2026-09-02・Issue #5）: 射影エンジンがGrok形式を読めるようになった
+  - 公式ソース（xai-org/grok-build）を直接読んでスキーマを確定: `~/.grok/sessions/<encoded-cwd>/<id>/` の `chat_history.jsonl`（ConversationItem行）＋ `summary.json`（info.id/cwd・created_at・generated_title）
+  - `src/extract-grok.ts`: 本人の発話は `<user_query>` の包みを外して原文で。`synthetic_reason` 付きと `<user_info>` 前置きは注入扱い。tool_calls からツール・ファイル・コマンドも採る
+  - `detectHarness` がgrokを判定／`relay show <chat_history.jsonl>` は隣の summary.json も読む
+  - テスト**248件**緑（+5）／破壊テスト済み（synthetic_reason無視→1件red→戻すと緑）
+  - ⚠️ **実機サンプル未検証**（Grok Buildは有料ログインが要る）。一覧・「続きから」への統合は、実物の記録で答え合わせしてから（fixtureは公式のserde定義から起こした）
+
 ## 🔨 いまやっていること（公開の残り）
 - [x] tarball実機テスト → GitHubへコミット・push
 - [x] Zenn記事published（2026-09-01）: https://zenn.dev/shoujiki_panman/articles/session-relay-no-handoff ／READMEも読者の場面から始まる構成に改稿

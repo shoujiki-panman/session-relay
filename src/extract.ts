@@ -1,5 +1,6 @@
 import { extractClaude } from "./extract-claude.ts";
 import { extractCodex } from "./extract-codex.ts";
+import { extractGrok } from "./extract-grok.ts";
 import { detectHarness, parseJsonl } from "./parse.ts";
 import type { SessionRecord } from "./types.ts";
 
@@ -14,6 +15,7 @@ export function extractSession(raw: string): SessionRecord | null {
   const rows = parseJsonl(raw);
   const harness = detectHarness(rows);
   if (harness === null) return null;
+  if (harness === "grok") return extractGrok(rows);
   return harness === "claude-code" ? extractClaude(rows) : extractCodex(rows);
 }
 

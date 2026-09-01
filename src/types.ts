@@ -1,7 +1,7 @@
 import type { TurnEnding } from "./turns.ts";
 
 /** 対応ハーネス */
-export type Harness = "claude-code" | "codex";
+export type Harness = "claude-code" | "codex" | "grok";
 
 /**
  * 発話の種類。

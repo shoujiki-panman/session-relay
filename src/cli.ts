@@ -13,7 +13,8 @@
  *   show <session.jsonl>                  射影の中身を確かめる
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { quitQuietlyOnBrokenPipe } from "./pipe.ts";
 import { USAGE, unknownArg, wantsHelp } from "./usage.ts";
 import { install } from "./install.ts";
@@ -23,7 +24,8 @@ import { groupByProject, pickProject, renderProjects } from "./projects.ts";
 import { buildContext } from "./context.ts";
 import { renderTable } from "./list.ts";
 import { pickInteractively } from "./run-picker.ts";
-import { extractSession, humanUtterances } from "./extract.ts";
+import { extractSession, humanUtterances, parseJsonl } from "./extract.ts";
+import { extractGrok } from "./extract-grok.ts";
 import { readRepoSignals } from "./repo.ts";
 import { currentSessionFor } from "./sessions.ts";
 import {
@@ -36,7 +38,11 @@ import {
 } from "./query.ts";
 
 function show(path: string): number {
-  const record = extractSession(readFileSync(path, "utf8"));
+  // Grokのセッションはディレクトリ2ファイル構成。chat_history.jsonlを見せられたら隣のsummary.jsonも読む
+  const summaryPath = join(dirname(path), "summary.json");
+  const record = path.endsWith("chat_history.jsonl") && existsSync(summaryPath)
+    ? extractGrok(parseJsonl(readFileSync(path, "utf8")), readFileSync(summaryPath, "utf8"))
+    : extractSession(readFileSync(path, "utf8"));
   if (record === null) {
     process.stderr.write("形式を判定できませんでした\n");
     return 1;
