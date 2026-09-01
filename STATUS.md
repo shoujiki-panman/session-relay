@@ -1,4 +1,4 @@
-# 進捗ボード — session-relay（2026-08-25）
+# 進捗ボード — session-relay（2026-09-01更新）
 
 ## ✅ 完了したこと
 - [x] **Phase 0完了**（2026-08-25）: 引き継ぎ書の壊れ方を自分の実データで実測
@@ -166,11 +166,25 @@
   - **破壊テスト**: Access検証のmiddlewareを外すと1件red → 戻すと6件green
   - ⚠️ **まだCloudflare側は触っていない**。Tunnelを張る・AccessアプリとAUDを作る・Claudeモバイルのカスタムコネクタに登録する、は未実施
 
-## 🔨 いまやっていること
+- [x] 🌐 **Cloudflare側を構築し、スマホ実機E2Eに成功**（2026-09-01・複数セッション合作）
+  - ドメイン **shoujiki-panman.com** を購入（$10.46/年・自動更新OFF＝**2027-09-01失効。来年8月に更新判断**）
+  - Tunnel `relay-deposit` → `relay.shoujiki-panman.com` → 127.0.0.1:8788（`~/.cloudflared/config.yml`・**httpHostHeader: 127.0.0.1が必須**。無いとMCP側のHost検査が403にする）
+  - Zero Trust Free（チーム名 `shoujiki-panman`）／MCP Portals > MCP serversに登録（Auth type=None）／ポリシー `only-tanuma`（Emails=本人のみ）
+  - 🐛 **AccessアプリのSubdomain/Domainが空のままだと門番が立たない**（実測: 素通りしてMacの403が返った＝二段目の守りが仕事をした）。`relay`+`shoujiki-panman.com` を設定して解決
+  - 検証条件の置き場: `~/.config/session-relay/deposit-http.env`（TEAM_DOMAIN・AUD）
+  - **実機E2E**: Web版Claude（合成データ）→iPhone版Claude（実会話）の両方でMacへ投函成功。未認証は401、JWTなし/無効/偽Hostは403。証跡=evidence/claude-mobile-e2e-2026-09-01.md（個人情報・実URLは載せない）
+- [x] 📦 **v0.2.0の公開準備**（2026-09-01・Codexセッションが枠切れまで進め、このセッションが引き継ぎ）
+  - README再構成（最短で試す／実機確認済みの記述へ）・SECURITY.md・CHANGELOG.md・docs/remote-mcp-ja.md（再現手順205行）・examples/cloudflared/config.yml
+  - KICKOFF/START-HEREをPhase 4（公開）へ更新。**スマホ投函口は共有サービスにしない／外向きは書き込み専用**を決定として明文化
+  - テスト241件緑／lint・strict型チェック・build緑
+
+## 🔨 いまやっていること（公開の残り）
+- [x] tarball実機テスト → GitHubへコミット・push
+- [ ] Zenn記事の下書き（published: false・実体験中心）→ 本人確認後にpublish
+- [ ] npm publish 0.2.0（**本人の `npm login` が要る**）
 - MulmoTerminalで「会話の続き」を開いて、タップ→下書き→送信 が通るかを**本人が**確かめる
 - Codexの**対話TUI**で「続きから」→ MCP承認 → 現在地が答えられるかを確かめる（headlessは落ちる・上の⚠️）
-- publish するかどうか（名前は決めた・まだ出していない）
-- スマホ投函口はMac側（HTTP＋Access署名検証）まで出来た。次は**Cloudflare側**（Tunnel・Accessアプリ・AUD）を作って、Claudeモバイルのカスタムコネクタから「この会話をrelayに預けて」を実機で確かめる
+- 投函口サーバー＋Tunnelの**常駐化**（いまは手動起動。Macを再起動すると止まる）と、利用者ごとのレート制限
 
 ## ⚠️ いまの限界（分かっていて残していること）
 - gitの欄は**relayを打ったディレクトリ**のリポジトリを映す。会話の話題と別のリポジトリのことがある

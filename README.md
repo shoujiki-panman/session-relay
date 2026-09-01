@@ -4,6 +4,37 @@
 
 `relay` と打つと、いま話していた会話が新しいセッションで開く。要約は挟まない。
 
+Claude CodeとCodexが手元に残すネイティブ履歴を直接読みます。普通のClaudeモバイル／Web会話は、
+本人が「relayに預けて」と明示したときだけ、書き込み専用のリモートMCPから自分のMacへ預けられます。
+
+> **配布状況（2026-09-01）**: GitHubから利用できます。npm packageはまだ公開していません。
+> 作者が運営する共有サーバーはありません。モバイル投函口は各利用者が自分のCloudflareとMacへ
+> セルフホストします。
+
+## 最短で試す
+
+Node.js 20以降が必要です。現在の実機確認はmacOSで行っています。
+
+```sh
+git clone https://github.com/shoujiki-panman/session-relay.git
+cd session-relay
+npm ci
+npm run build
+npm link
+relay install
+```
+
+新しいClaude Code／Codexの会話で、次のように話しかけます。
+
+```text
+続きから
+キャンバスの話の続きをやりたい
+前の会話で私が実際に打った言葉を3つ、原文のまま
+```
+
+スマホの普通のClaude会話まで繋ぐ場合は、
+[`docs/remote-mcp-ja.md`](docs/remote-mcp-ja.md) のCloudflare Tunnel＋Access手順へ進んでください。
+
 ```
 relay                    別のスレッドで続きから開く
 relay --to codex         Codexで開く
@@ -100,11 +131,13 @@ Claude Code の会話をそのまま再開したいだけなら `claude -r`（�
 ## 使うには
 
 ```sh
-npm install -g @shoujiki-panman/session-relay   # relay コマンドが入る
-npx @shoujiki-panman/session-relay --projects   # 入れずに試す
+# npm公開前
+git clone https://github.com/shoujiki-panman/session-relay.git
+cd session-relay && npm ci && npm run build && npm link
 ```
 
-手元で開発するなら clone して `npm install` と `ln -s "$PWD/bin/relay" ~/.local/bin/relay`。
+手元で開発するならcloneして `npm ci`。`npm link` の代わりに
+`ln -s "$PWD/bin/relay" ~/.local/bin/relay` でもよい。
 配るのはビルド済みの `dist` だけで、`src` の `.ts` は入れていない——
 **Nodeは `node_modules` の中では型を剥がさない**ので、`.ts` を配ると入れた人の環境で動かない。
 
@@ -189,7 +222,7 @@ codex mcp add relay -- /絶対パス/bin/relay.js mcp
 
 `ref` を必ず書いて返している。書かないと、AIはもう一度自分で探しに行く。
 
-### スマホの普通のClaudeチャットから預ける（ローカル実証）
+### スマホの普通のClaudeチャットから預ける
 
 Claude CodeのRemote Controlではなく、Claudeアプリで普通に始めた会話は
 `~/.claude` に記録されないため、従来のrelayからは見えない。そこで、本人が
@@ -221,9 +254,15 @@ relay mcp-deposit-http          # http://127.0.0.1:8788/mcp（127.0.0.1にしか
 - `Host` が localhost 系でなければ拒否（DNS rebinding対策）。ポートは `SESSION_RELAY_DEPOSIT_PORT`
 - 見える道具は stdio 版と同じく `deposit_conversation` **1つだけ**
 
-**実証したのはここまで**（2026-09-01）: 本物のMCPクライアントでHTTP越しに接続し、道具1つ・原文の保存・
-JWTが無い要求を403・偽のHostを403、まで確認した。**まだCloudflare Tunnelを実際に張って
-Claudeモバイルのカスタムコネクタから預けたことは無い。**
+**実機確認済み**（2026-09-01）: Cloudflare Tunnel＋Access Managed OAuthを通し、Web版Claudeの
+合成テストとiPhone版Claudeの普通の会話をMacへ預けた。未認証の公開リクエストは401、originでは
+JWTなし・無効JWT・偽Hostを403で拒否した。外向きに見える道具は1つ、保存権限はディレクトリ0700・
+ファイル0600だった。個人の会話本文を除いた記録は
+[`evidence/claude-mobile-e2e-2026-09-01.md`](evidence/claude-mobile-e2e-2026-09-01.md) にある。
+
+再現手順、Cloudflare設定、Claudeモバイルでの有効化は
+[`docs/remote-mcp-ja.md`](docs/remote-mcp-ja.md) を参照。脅威モデルと既知の限界は
+[`SECURITY.md`](SECURITY.md) に分けた。
 
 **標準出力はJSON-RPCで埋まっている。** 何かを知らせたいときは stderr に書くこと——
 1行でも標準出力に混ざると通信が壊れる。
@@ -252,8 +291,10 @@ Claudeモバイルのカスタムコネクタから預けたことは無い。**
 - [x] **Phase 2** 結果の信号（ターンの最後・git）。渡された先が進捗を過小評価しないように
 - [x] **Phase 3の入口** `relay` コマンド／ヘッダーボタン／`relay` スキル（「続きから」の1手）
 - [x] **Phase 3** MCPサーバー（AIが自分で取りに来る）。Claude Code で接続を確認
+- [x] **Phase 3.5** ClaudeモバイルからCloudflare Access経由でMacへ預け、Codex側から読めることを実機確認
 - [ ] Codexの対話TUIで「続きから」が通ることの確認（headlessは承認で落ちる）
-- [ ] 配布（`npx` で入る形。npmの `session-relay` は別人が使用中）
+- [ ] npm配布（名前は `@shoujiki-panman/session-relay`。公開前のtarball検証まで実施）
+- [ ] リモート投函口の常駐化と認証済み利用者ごとのレート制限
 - [ ] 索引（複数の会話から探して引く）
 
 ## 開発の決まりごと

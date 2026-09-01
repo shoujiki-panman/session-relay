@@ -18,7 +18,7 @@ const reply = (text: string, ok = true): ToolResult => ({
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : "保存に失敗しました");
 
 export function createDepositServer(inbox: Inbox = createInbox()): McpServer {
-  const server = new McpServer({ name: "relay-deposit", version: "0.1.0" });
+  const server = new McpServer({ name: "relay-deposit", version: "0.2.0" });
   server.registerTool(
     "deposit_conversation",
     {

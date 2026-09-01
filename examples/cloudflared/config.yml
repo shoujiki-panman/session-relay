@@ -1,0 +1,12 @@
+# ~/.cloudflared/config.yml
+# 3か所の <...> を、自分のTunnelとhostnameへ置き換える。
+tunnel: <tunnel-uuid>
+credentials-file: /absolute/path/to/.cloudflared/<tunnel-uuid>.json
+
+ingress:
+  - hostname: relay.example.com
+    service: http://127.0.0.1:8788
+    originRequest:
+      # session-relayはlocalhost系以外のHostを拒む。削除しない。
+      httpHostHeader: 127.0.0.1
+  - service: http_status:404

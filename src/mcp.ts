@@ -191,7 +191,7 @@ function addResumePrompt(server: McpServer): void {
 }
 
 export function createServer(inbox: Inbox = createInbox()): McpServer {
-  const server = new McpServer({ name: "relay", version: "0.1.0" });
+  const server = new McpServer({ name: "relay", version: "0.2.0" });
   addContextTool(server);
   addListTools(server);
   addInboxTools(server, inbox);
