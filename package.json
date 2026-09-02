@@ -26,6 +26,9 @@
     "jose": "^6.2.10",
     "zod": "^4.4.3"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
