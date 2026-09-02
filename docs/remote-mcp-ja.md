@@ -221,3 +221,15 @@ relayの最新の続き
 
 どちらもユーザーのLaunchAgentなので、**ログインしている間だけ**動く。
 蓋を閉じて寝かせない設定（電源接続＋スリープ防止）は別途必要。
+
+## つまずき: Authentication error（user/group information が取れない）
+
+投函しようとして `Failed to fetch user/group information from the identity provider` が出るときは、
+**Zero Trustにログイン方法（IdP）が実質1つも無い**状態を疑う。
+
+MCPサーバーを登録すると `Cloudflare` というIdPが自動で入るが、これだけでは
+ユーザー情報を返せずに認証が止まることがある（2026-09-02 実測）。
+
+直し方: **Integrations → Identity providers → Add an identity provider → One-time PIN** を追加する。
+メールに届く6桁コードでログインできるようになる。アプリ側が
+`Accept all available identity providers` のままなら、追加するだけで選べるようになる。

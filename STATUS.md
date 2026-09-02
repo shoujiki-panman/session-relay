@@ -211,6 +211,12 @@
   - 入っているハーネスだけ検査／投函口は使っている人（inboxか設定がある人）だけ検査／実環境で全項目✅を実測
   - テスト**251件**緑（+3・tmpホームと使い捨てHTTPサーバーで生死まで実測）
 
+- [x] 🔑 **スマホ投函の認証エラーを解消**（2026-09-02深夜）: `Failed to fetch user/group information from the identity provider`
+  - 原因: Zero TrustのIdPが**MCP登録時に自動追加された `Cloudflare` の1つだけ**で、One-time PINが未登録だった（ユーザー情報を返せずに認証が止まる）
+  - 直し: Integrations → Identity providers に **One-time PIN** を追加（アプリ側は `Accept all available identity providers` のままでよい）
+  - **実機で再現確認**: iPhoneのClaudeから投函成功。常駐化後・0.2.3以降で初めての実運用データが受信箱に届いた
+  - docs/remote-mcp-ja.md に「つまずき」節として追記
+
 ## 🔨 いまやっていること（公開の残り）
 - [x] tarball実機テスト → GitHubへコミット・push
 - [x] Zenn記事published（2026-09-01）: https://zenn.dev/shoujiki_panman/articles/session-relay-no-handoff ／READMEも読者の場面から始まる構成に改稿
