@@ -5,11 +5,11 @@
  * 1行でも余計に書くと通信が壊れる）。出すのは呼んだ側の仕事。
  */
 import { type Memory, load, remember, remembered, save } from "./cache.ts";
-import { type Listed, describe, pick } from "./list.ts";
+import { type Listed, describe, isSubagentRecord, pick } from "./list.ts";
 import { type Project, groupByProject, pickProject } from "./projects.ts";
 import { type BuiltContext, buildContext, buildContextFrom } from "./context.ts";
 import { readRepoSignals } from "./repo.ts";
-import { type KnownCwd, defaultRoots, previousSessionsFor, recentSessions } from "./sessions.ts";
+import { type KnownCwd, defaultRoots, peekOf, previousSessionsFor, recentSessions } from "./sessions.ts";
 
 /**
  * ファイル数で切ってはいけない。下請け（サブエージェント）の記録は桁違いに多く、
@@ -46,6 +46,8 @@ export function humanSessions(limit: number, onlyCwd: string | null): Listed[] {
   let learned = false;
   for (const entry of recentSessions(undefined, SCAN_LIMIT, onlyCwd, knownCwd)) {
     const known = remembered(memory, entry.path, entry.mtimeMs);
+    // 覚えていないものは、まず8KBだけ見て下請けの記録を落とす（深く読むのは人の会話だけ）
+    if (known === null && isSubagentRecord(peekOf(entry.path))) continue;
     const row = known ?? describe(entry);
     if (known === null) {
       remember(memory, entry.path, entry.mtimeMs, row);

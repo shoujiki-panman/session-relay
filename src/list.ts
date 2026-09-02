@@ -7,29 +7,11 @@
  * どの会話でも選んで引けるようにするための一覧を作る。
  */
 import { basename } from "node:path";
-import { extractSession, humanUtterances } from "./extract.ts";
+import { scanHead } from "./scan-head.ts";
 import { parseJsonl } from "./parse.ts";
-import { asString, isRecord } from "./types.ts";
+import { asString } from "./types.ts";
 import { type SessionEntry, headOf } from "./sessions.ts";
 
-/**
- * 人が実際に打った会話かどうか。
- * サブエージェントの記録は `promptSource: "sdk"` / `entrypoint: "sdk-cli"` で、
- * 人が打った行は `promptSource: "typed"` かつ `origin: {kind: "human"}`（実測）。
- * これを見ないと、一覧が下請けの記録で埋まる。
- */
-function typedByHuman(raw: string): boolean {
-  return parseJsonl(raw).some((row) => {
-    if (asString(row["promptSource"]) === "typed") return true;
-    const origin = row["origin"];
-    if (isRecord(origin) && origin["kind"] === "human") return true;
-    // Codexの旧形式は user_message、2026-09からは message(role:user)（実測）
-    const payload = row["payload"];
-    if (!isRecord(payload)) return false;
-    if (payload["type"] === "user_message") return true;
-    return payload["type"] === "message" && payload["role"] === "user";
-  });
-}
 
 export interface Listed {
   readonly path: string;
@@ -79,7 +61,14 @@ function placeOf(cwd: string | null): string {
  * （実測: `'/Users/me/Desktop/スクリーンショット 2026-08-25 23.30.34.png'`）。
  */
 const QUOTED_PATH = /['"][~/][^'"\n]*['"]/g;
-const BARE_PATH = /\S*\/\S+\.(?:png|jpe?g|gif|webp|heic|pdf|mov|mp4)\b/gi;
+/**
+ * ⚠️ ここは正規表現の書き方で性能が壊れる。
+ * 以前は `\S*\/\S+\.(拡張子)` だったが、`\S*`と`\S+`の二段が長い行で
+ * バックトラッキング爆発を起こし、**一覧の初回6.2秒のうち4.5秒**がこの1本だった
+ * （実測 2026-09-03・CPUプロファイル）。量指定子は1つにして、
+ * 「パスかどうか（/を含むか）」は置換側で判定する。
+ */
+const BARE_PATH = /[^\s'"]+\.(?:png|jpe?g|gif|webp|heic|pdf|mov|mp4)\b/gi;
 /** 画像の後ろにハーネスが足す説明。人の言葉ではない */
 const IMAGE_NOTE = /\[Image:[^\]]*\]/g;
 /**
@@ -110,11 +99,19 @@ function stemOf(path: string): string {
   return TEMP_NAME.test(stem) ? " " : ` ${stem} `;
 }
 
+/**
+ * gist に渡す長さの上限。
+ * 発話にはログや貼り付けで**数百KB**のものがある（実測）。見出し44字と検索語400字に
+ * それ以上は要らないのに全文へ正規表現をかけていて、一覧の初回の大半がここに消えていた
+ * （実測 2026-09-03: 6.2秒中4.5秒）。切ってから加工する。
+ */
+const GIST_CHARS = 2000;
+
 /** 発話から「見出しにならないもの」を落として1行にする */
 function gist(text: string, onPath: (path: string) => string): string {
-  const cleaned = text
+  const cleaned = (text.length > GIST_CHARS ? text.slice(0, GIST_CHARS) : text)
     .replaceAll(QUOTED_PATH, onPath)
-    .replaceAll(BARE_PATH, onPath)
+    .replaceAll(BARE_PATH, (matched) => (matched.includes("/") ? onPath(matched) : matched))
     .replaceAll(IMAGE_NOTE, " ")
     .replaceAll(WRAP_TAG, " ")
     // ホスト名の後ろに区切りを入れる。入れないと「raycast.comこれ入れようかな」と詰まる
@@ -208,20 +205,36 @@ const searchableFrom = (utterances: readonly string[]): string =>
     .slice(0, SEARCH_CHARS)
     .toLowerCase();
 
+/**
+ * 下請け（サブエージェント）の記録か。**一覧に出す価値が無いものを、先に安く落とす。**
+ * 手元の実測（2026-09-03）では4000本中3%しか人の会話ではなく、
+ * 残り97%を深く読んでいたせいで一覧の初回が6秒かかっていた。
+ */
+export function isSubagentRecord(peek: string): boolean {
+  for (const row of parseJsonl(peek)) {
+    if (asString(row["promptSource"]) === "sdk") return true;
+    if (asString(row["entrypoint"]) === "sdk-cli") return true;
+  }
+  return false;
+}
+
+/** 見出しを作るのに足りたか。人の発話が1件でも取れたら、それ以上は読まない */
+const enoughForTopic = (raw: string): boolean => scanHead(raw).human.length > 0;
+
 export function describe(entry: SessionEntry): Listed {
-  const head = headOf(entry.path);
-  const record = extractSession(head);
-  const human = record === null ? [] : humanUtterances(record);
+  const head = headOf(entry.path, enoughForTopic);
+  // 一覧は経過もツールも使わない。全行を組み立てず、人の発話だけ拾う（実測で初回が数倍速くなる）
+  const { harness, human, typed } = scanHead(head);
   return {
     path: entry.path,
     ref: refOf(entry.path),
     cwd: entry.cwd,
     place: placeOf(entry.cwd),
-    harness: record?.harness === "codex" ? "codex" : "claude",
+    harness: harness === "codex" ? "codex" : "claude",
     when: stamp(entry.mtimeMs),
     topic: topicOf(human),
     utterances: human.length,
-    typed: typedByHuman(head) && !neverSpoke(human),
+    typed: typed && !neverSpoke(human),
     words: searchableFrom(human),
   };
 }

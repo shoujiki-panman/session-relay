@@ -8,19 +8,37 @@
  *   relay mcp-deposit-http    Cloudflare Access必須のリモート投函口
  *   relay show <session.jsonl>
  *
- * **手元に src があれば src を読む。** 配布物には src が入っていない（package.json の
- * files が dist だけ）ので、入れた人は必ず dist を読む。
- * 逆にすると、開発中に古い dist が黙って使われて「直したのに直っていない」になる
- * （2026-08-28 に実際にやった。出力が変わったのはデータが変わっただけだった）。
- * Nodeは node_modules の中では型を剥がさないので、配る方は必ずビルド済みが要る。
+ * **手元では src と dist の新しい方を読む。** 配布物には src が入っていない
+ * （package.json の files が dist だけ）ので、入れた人は必ず dist を読む。
+ *
+ * 常に src を読むと「直したのに直っていない」は防げるが、Nodeが毎回TypeScriptを
+ * 変換するので**同じ操作が dist の50倍かかる**（実測: 13MBのCodexセッションで 0.13秒 → 6.4秒）。
+ * 逆に常に dist だと、ビルドし忘れた古いコードが黙って動く（2026-08-28に踏んだ）。
+ * だから新しい方を選ぶ。直せば src が新しくなるので必ず反映され、
+ * ビルドすれば dist が新しくなるので速く戻る。
  */
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fromSource = existsSync(join(here, "..", "src", "cli.ts"));
-const dir = join(here, "..", fromSource ? "src" : "dist");
+const srcDir = join(here, "..", "src");
+const distDir = join(here, "..", "dist");
+
+/** そのディレクトリで一番新しいファイルの時刻。無ければ 0 */
+const newest = (dir, suffix) => {
+  if (!existsSync(dir)) return 0;
+  let latest = 0;
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith(suffix)) continue;
+    const { mtimeMs } = statSync(join(dir, name));
+    if (mtimeMs > latest) latest = mtimeMs;
+  }
+  return latest;
+};
+
+const fromSource = newest(srcDir, ".ts") > newest(distDir, ".js");
+const dir = fromSource ? srcDir : distDir;
 const ext = fromSource ? "ts" : "js";
 
 const args = process.argv.slice(2);

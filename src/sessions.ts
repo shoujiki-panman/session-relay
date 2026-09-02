@@ -119,8 +119,31 @@ export function recentSessions(
   return entries;
 }
 
-/** ファイルの先頭を返す（一覧に出す要約を作るため） */
-export const headOf = (path: string): string => readHead(path, DEEP_BYTES);
+/**
+ * 一覧の見出しを作るために読む量。少ない方から試し、**足りなければ深く読む**。
+ *
+ * 常に1MB読むと、Codexのような大きい記録が並ぶだけで一覧が数秒かかる
+ * （実測2026-09-03: 初回6.1秒。MCP越しだと丸ごと待ち時間になる）。
+ * かといって浅く固定すると、前置きが長い記録で発話を取りこぼす（実測: 128KB固定で20本中3本）。
+ */
+const HEAD_STEPS = [65_536, 262_144, DEEP_BYTES] as const;
+
+/** 下請けの記録かどうかを見分けるためだけの、ごく浅い読み */
+export const peekOf = (path: string): string => readHead(path, 8_192);
+
+/**
+ * ファイルの先頭を返す（一覧に出す要約を作るため）。
+ * `enough` が真を返した時点で止める。最後まで満たさなければ一番深く読んだ分を返す。
+ */
+export function headOf(path: string, enough: (raw: string) => boolean = () => true): string {
+  const size = statSync(path).size;
+  let raw = "";
+  for (const bytes of HEAD_STEPS) {
+    raw = readHead(path, bytes);
+    if (enough(raw) || bytes >= size) return raw;
+  }
+  return raw;
+}
 
 /**
  * その作業ディレクトリの会話を、ハーネスをまたいで新しい順に並べて返す。
