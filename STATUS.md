@@ -229,6 +229,9 @@
   - フック設定は**こちらから settings.json を書き換えない**。`relay install` が案内文を出すだけ（他の設定が入っている大事なファイルなので）
   - 実環境で実測: 未読3件を正しく1行で報告。テスト**258件**緑
 
+- [x] 📦 **0.2.4公開**（2026-09-02）: unread・既読の印・並びの安定化
+  - 🐛 publishが404で3回失敗。原因は**npmのログイン切れ**（npmは認証切れを404で返すことがある。`npm whoami` で切り分ける）。ついでに `publishConfig.access=public` を明示して `--access public` の打ち忘れも塞いだ
+
 ## 🔨 いまやっていること（公開の残り）
 - [x] tarball実機テスト → GitHubへコミット・push
 - [x] Zenn記事published（2026-09-01）: https://zenn.dev/shoujiki_panman/articles/session-relay-no-handoff ／READMEも読者の場面から始まる構成に改稿
