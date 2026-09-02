@@ -23,9 +23,11 @@ function typedByHuman(raw: string): boolean {
     if (asString(row["promptSource"]) === "typed") return true;
     const origin = row["origin"];
     if (isRecord(origin) && origin["kind"] === "human") return true;
-    // Codexは人が打った発話しか user_message に入れない
+    // Codexの旧形式は user_message、2026-09からは message(role:user)（実測）
     const payload = row["payload"];
-    return isRecord(payload) && payload["type"] === "user_message";
+    if (!isRecord(payload)) return false;
+    if (payload["type"] === "user_message") return true;
+    return payload["type"] === "message" && payload["role"] === "user";
   });
 }
 
@@ -140,7 +142,8 @@ const HOST_ONLY = /^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
  * 「automated run」はその**後ろ**に来るので先頭一致に掛からなかった。
  * 本人の言葉:「ブラウザ形式だるいな」——一覧の8割がこれでは、どう見せてもだるい。
  */
-const INJECTED = /^(this is an automated run|security boundary\b|<[a-z-]+-task\b)/i;
+const INJECTED =
+  /^(this is an automated run|security boundary\b|<[a-z-]+-task\b|the following is the codex agent history|<recommended_plugins>|<environment_context>|<app-context>|# files mentioned by the user:)/i;
 
 /** 見出しとして意味を持つか */
 const meaty = (text: string): boolean =>
@@ -185,7 +188,8 @@ const stamp = (mtimeMs: number): string => {
  * スクショ1枚だけの会話（＝人が何かした）は残す。
  */
 const neverSpoke = (utterances: readonly string[]): boolean =>
-  utterances.length > 0 &&
+  // 1件も残らなかった会話（起動しただけ・注入だけ）も「話していない」。選ぶ意味がないので一覧から外す
+  utterances.length === 0 ||
   // 生のまま見るのは `<scheduled-task>続けて</scheduled-task>` のため。
   // 囲いを外してからでは中身の「続けて」が人の言葉に見えてしまう
   utterances.every((text) => INJECTED.test(text.trimStart()) || INJECTED.test(clean(text)));

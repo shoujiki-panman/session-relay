@@ -32,6 +32,13 @@ const INJECTED_PREFIXES = [
   "[Request interrupted by user",
   "Base directory for this skill:",
   "Caveat: The messages below",
+  // Codex（desktop）が毎ターン差し込む前置き
+  "<recommended_plugins>",
+  "<environment_context>",
+  "<app-context>",
+  "# Files mentioned by the user:",
+  // Codexの承認確認セッション。人の会話ではないので一覧に出さない（実測で見出しを占領していた）
+  "The following is the Codex agent history",
   // relayが渡した文脈そのもの。通常は relay-block.ts で畳まれるが、
   // 畳めなかったとき（入れ子が深すぎるなど）に人間の発話として数えないための保険
   RELAY_HEADER,

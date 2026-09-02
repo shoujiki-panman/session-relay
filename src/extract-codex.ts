@@ -6,6 +6,7 @@ import {
   type Utterance,
   asString,
   isRecord,
+  recordsOf,
 } from "./types.ts";
 
 interface Acc {
@@ -34,12 +35,33 @@ function collectToolCall(payload: Row, acc: Acc): void {
   if (input !== null) acc.commands.push(input);
 }
 
-function applyUserMessage(payload: Row, at: string | null, acc: Acc): void {
-  const text = asString(payload["message"]);
-  if (text === null || text === "") return;
+function pushUtterance(text: string, at: string | null, acc: Acc): void {
+  if (text === "") return;
   const kind = classifyUtterance(text);
   if (kind === "human") endTurn(acc.turns);
   acc.utterances.push({ at, kind, text });
+}
+
+function applyUserMessage(payload: Row, at: string | null, acc: Acc): void {
+  pushUtterance(asString(payload["message"]) ?? "", at, acc);
+}
+
+/**
+ * 2026-09の記録形式。発話は `event_msg/user_message` ではなく
+ * `response_item/message`（role: user / assistant）に入る（実測）。
+ * 古い形式のセッションも残っているので、両方読む。
+ */
+function applyMessage(payload: Row, at: string | null, acc: Acc): void {
+  const role = asString(payload["role"]);
+  if (role !== "user" && role !== "assistant") return; // developerはシステム側の指示
+  const text = recordsOf(payload["content"])
+    .map((block) => asString(block["text"]) ?? "")
+    .filter((part) => part !== "")
+    .join("\n")
+    .trim();
+  if (text === "") return;
+  if (role === "assistant") noteAssistantText(acc.turns, at, text);
+  else pushUtterance(text, at, acc);
 }
 
 function applyMeta(rowType: unknown, payload: Row, acc: Acc): void {
@@ -59,7 +81,8 @@ function applyRow(row: Row, acc: Acc): void {
 
   applyMeta(row["type"], payload, acc);
   const payloadType = payload["type"];
-  if (payloadType === "user_message") applyUserMessage(payload, at, acc);
+  if (payloadType === "message") applyMessage(payload, at, acc);
+  else if (payloadType === "user_message") applyUserMessage(payload, at, acc);
   else if (payloadType === "agent_message") noteAssistantText(acc.turns, at, asString(payload["message"]) ?? "");
   else if (payloadType === "custom_tool_call" || payloadType === "function_call") {
     collectToolCall(payload, acc);

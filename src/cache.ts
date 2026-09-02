@@ -30,7 +30,7 @@ const cachePath = (): string => join(homedir(), ".cache", "session-relay", "list
  * こちらの作り方が変われば覚えた内容は古くなる**。実測（2026-08-29）:
  * 予約実行の自動文を見出しから外したのに、覚えていた35件がそのまま残った。
  */
-const SHAPE = 5;
+const SHAPE = 7; // 6: Codexの新形式に対応（古い覚え書きは捨てる）
 
 /** 壊れていたら黙って捨てる。速くするための仕組みで止まるのは本末転倒 */
 export function load(path: string = cachePath()): Memory {
