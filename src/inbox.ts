@@ -145,7 +145,8 @@ function readAll(dir: string): Deposit[] {
   return names
     .map((name) => readOne(dir, name))
     .filter((item): item is Deposit => item !== null)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    // 同じミリ秒の投函でも順序が決まるよう、時刻だけでなくidまで見る
+    .sort((a, b) => `${b.createdAt}\t${b.id}`.localeCompare(`${a.createdAt}\t${a.id}`));
 }
 
 /** 受信箱に貯められる件数の上限。認証を持つ相手にもディスクは食い潰させない */

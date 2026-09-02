@@ -20,6 +20,7 @@ import { USAGE, unknownArg, wantsHelp } from "./usage.ts";
 import { install } from "./install.ts";
 import { runDeposits } from "./deposits-cli.ts";
 import { runDoctor } from "./doctor.ts";
+import { runUnread } from "./unread-cli.ts";
 import { canvas, page, records } from "./exports.ts";
 import { groupByProject, pickProject, renderProjects } from "./projects.ts";
 import { buildContext } from "./context.ts";
@@ -282,6 +283,8 @@ if (command === "install") {
   process.exitCode = runDeposits(args.slice(1));
 } else if (command === "doctor") {
   process.exitCode = await runDoctor();
+} else if (command === "unread") {
+  process.exitCode = runUnread();
 } else if (command === "show" && args[1] !== undefined) {
   process.exitCode = show(args[1]);
 } else {

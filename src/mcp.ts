@@ -11,6 +11,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { markRead } from "./unread.ts";
 import {
   type Answer,
   answerContext,
@@ -156,6 +157,7 @@ function addDepositReadTool(server: McpServer, inbox: Inbox): void {
     },
     ({ ref }) => {
       const found = inbox.get(ref);
+      if (found !== null) markRead(found);
       return reply(
         found === null
           ? { ok: false, text: "預けられた会話が見つかりません。list_depositsで確認してください。" }

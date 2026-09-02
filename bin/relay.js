@@ -33,6 +33,6 @@ const entry =
         ? "deposit-http-main"
         : "cli";
 // cli 側は先頭に「何をするか」を要求する。`relay --print` のように省かれたら足す
-if (entry === "cli" && !["show", "install", "deposits", "doctor"].includes(args[0])) process.argv.splice(2, 0, "relay");
+if (entry === "cli" && !["show", "install", "deposits", "doctor", "unread"].includes(args[0])) process.argv.splice(2, 0, "relay");
 
 await import(pathToFileURL(join(dir, `${entry}.${ext}`)).href);

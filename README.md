@@ -258,6 +258,18 @@ relay mcp-deposit
 `~/.local/share/session-relay/inbox/` にディレクトリ `0700`・ファイル `0600` で保存する
 （上限100件）。届いた投函の一覧と削除は `relay deposits` ／ `relay deposits rm <ref>`。
 
+**起動時に未読を知らせる。** `relay unread` は、まだ読んでいない投函を1行で出す（無ければ黙る）。
+Claude Codeの起動時に自動で出すなら `~/.claude/settings.json` に:
+
+```json
+{ "hooks": { "SessionStart": [{ "matcher": "startup|resume",
+  "hooks": [{ "type": "command", "command": "relay unread" }] }] } }
+```
+
+標準出力に書いた行がそのままAIの文脈に入るので、「預けた会話の続き」と言えば読みに行く。
+既読の印は**投函ファイルを書き換えず**、`~/.local/share/session-relay/read-at` に
+「最後に読んだ投函の時刻とid」を置くだけ（`get_deposit` で読んだ時点で進む）。
+
 外向きにはこの書き込み専用MCPだけを出し、通常の `relay mcp` はローカルから出さない。
 
 ### 外から預ける（Cloudflare Tunnel + Access）

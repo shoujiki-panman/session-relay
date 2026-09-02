@@ -8,6 +8,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, symlinkSync } from "node:fs";
+import { defaultInboxDir } from "./inbox.ts";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -92,6 +93,16 @@ export const apply = (steps: readonly Step[], dryRun: boolean): string[] =>
   });
 
 /** MCPに登録するのは**絶対パス**。起動するのは別のプロセスで、PATHが違う */
+/**
+ * 起動時に未読を知らせるフックの案内。
+ * `~/.claude/settings.json` は他の設定も入る大事なファイルなので、**こちらからは書き換えない**。
+ */
+const HOOK_HINT = `
+起動時に未読の投函を知らせるには、~/.claude/settings.json に足してください:
+  "hooks": { "SessionStart": [{ "matcher": "startup|resume",
+    "hooks": [{ "type": "command", "command": "relay unread" }] }] }
+`;
+
 export function install(dryRun: boolean): number {
   const root = dirname(dirname(fileURLToPath(import.meta.url)));
   const steps = plan(root, join(root, "bin", "relay.js"), homedir(), realWorld);
@@ -101,5 +112,6 @@ export function install(dryRun: boolean): number {
       ? "（--dry-run なので何もしていません）\n"
       : "新しいセッションで「続きから」と言えば、前の会話を読み込みます\n",
   );
+  if (!dryRun && existsSync(defaultInboxDir())) process.stdout.write(HOOK_HINT);
   return 0;
 }
