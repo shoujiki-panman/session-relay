@@ -232,6 +232,10 @@
 - [x] 📦 **0.2.4公開**（2026-09-02）: unread・既読の印・並びの安定化
   - 🐛 publishが404で3回失敗。原因は**npmのログイン切れ**（npmは認証切れを404で返すことがある。`npm whoami` で切り分ける）。ついでに `publishConfig.access=public` を明示して `--access public` の打ち忘れも塞いだ
 
+- [x] 🚫 **Issue #6（他人とのリレー）は作らない判断**（2026-09-03・本人）: 「他の人と作業ならGitHubでいいかも」
+  - 共有すべきもの（コード・決定・議論）は既にGitHubに乗る。relayが運ぶのは**自分の頭の続き**で、他人に渡す必要がないもの
+  - エージェント同士も同様（親子の連携はハーネス側で解けている）。必要なら `relay --print` を手で渡せば足りる
+
 ## 🔨 いまやっていること（公開の残り）
 - [x] tarball実機テスト → GitHubへコミット・push
 - [x] Zenn記事published（2026-09-01）: https://zenn.dev/shoujiki_panman/articles/session-relay-no-handoff ／READMEも読者の場面から始まる構成に改稿
