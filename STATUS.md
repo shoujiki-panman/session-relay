@@ -217,6 +217,11 @@
   - **実機で再現確認**: iPhoneのClaudeから投函成功。常駐化後・0.2.3以降で初めての実運用データが受信箱に届いた
   - docs/remote-mcp-ja.md に「つまずき」節として追記
 
+- [x] 🔍 **Issue #7（自動題名を索引に）は実測して不採用**（2026-09-02）: **取り込む対象が存在しなかった**
+  - 直近400本を走査: `type:"summary"` **0本**／`custom-title` **4本(1%)**。全会話grepでもsummary行は0件
+  - `~/.claude.json`・`history.jsonl`・`sessions/*.json` も確認したが、会話ごとの題名は保存されていない（画面の題名はUIが持つだけ）
+  - 実用の結論: **スクショは「自分が打った言葉が写る位置」で撮る**（索引は本人の発話の冒頭400字）。READMEに追記
+
 ## 🔨 いまやっていること（公開の残り）
 - [x] tarball実機テスト → GitHubへコミット・push
 - [x] Zenn記事published（2026-09-01）: https://zenn.dev/shoujiki_panman/articles/session-relay-no-handoff ／READMEも読者の場面から始まる構成に改稿
