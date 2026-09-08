@@ -41,9 +41,15 @@ function repoSection(repo: RepoSignals | undefined): string[] {
   ];
 }
 
-export function buildContext(sessionPath: string, repo?: RepoSignals): string | null {
+/**
+ * この文脈がどこから来たかを1行で添える。
+ *
+ * **見出しの次の行に入れること。** 見出しより前に足すと `isRelayContext` が
+ * 文脈ブロックだと気づけなくなり、入れ子を畳む処理（relay-block.ts）が効かなくなる。
+ */
+export function buildContext(sessionPath: string, repo?: RepoSignals, note?: string): string | null {
   const record = extractSession(readFileSync(sessionPath, "utf8"));
-  return record === null ? null : render(record, repo);
+  return record === null ? null : render(record, repo, note);
 }
 
 export interface BuiltContext {
@@ -67,12 +73,13 @@ export function buildContextFrom(
   return null;
 }
 
-function render(record: SessionRecord, repo: RepoSignals | undefined): string {
+function render(record: SessionRecord, repo: RepoSignals | undefined, note?: string): string {
   const human = humanUtterances(record);
   const recent = record.turnEndings.slice(-RECENT_TURNS);
   return [
     "# 前の会話の記録（要約なし・本人の発話は原文のまま）",
     "これは同じ人物の直前までの会話です。話が途切れないように、ここから続けてください。",
+    ...(note === undefined ? [] : [note]),
     "",
     `作業場所: ${record.cwd ?? "-"} (branch: ${record.gitBranch ?? "-"})`,
     `期間: ${record.startedAt ?? "-"} 〜 ${record.endedAt ?? "-"}`,

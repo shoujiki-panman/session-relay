@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { HANDOFF_TTL_MS, type Handoff, clearHandoff, peekHandoff, putHandoff } from "../src/handoff.ts";
 import { markedContext } from "../src/query.ts";
+import { isRelayContext, parseRelayContext } from "../src/relay-block.ts";
+import { buildContext } from "../src/context.ts";
 import { runMark, runMarkCommand, runMarkShow } from "../src/mark-cli.ts";
 
 const roots: string[] = [];
@@ -253,5 +255,32 @@ describe("relay mark の引数", () => {
   it("Error: 知らない指定は読み飛ばさず 2 を返す（別の会話に印がつくのを防ぐ）", () => {
     expect(runMarkCommand(["--recnt"])).toBe(2);
     expect(runMarkCommand(["--all"])).toBe(2);
+  });
+});
+
+describe("印で来たことが見えるか（押しても拾われても画面が変わらないので）", () => {
+  it("正常系: 印から読んだ文脈には、そう名乗る行が入る", () => {
+    const file = markFile();
+    putHandoff(mark({ path: someFile() }), file);
+    const got = markedContext("/w", {}, new Date(), file);
+    expect(got?.context).toContain("relay mark");
+    expect(got?.context).toContain("📌");
+  });
+
+  it("Corner: 名乗る行を足しても、入れ子を畳む処理が効かなくならない", () => {
+    const file = markFile();
+    putHandoff(mark({ path: someFile() }), file);
+    const context = markedContext("/w", {}, new Date(), file)?.context ?? "";
+    // 見出しより前に足すと、ここが false になって入れ子が畳めなくなる
+    expect(isRelayContext(context)).toBe(true);
+    expect(parseRelayContext(context)?.utterances).toEqual(["前の話"]);
+  });
+
+  it("Corner: 印を使っていない普通の文脈には、その行を入れない", () => {
+    const path = someFile();
+    const plain = markedContext("/w", {}, new Date(), markFile());
+    expect(plain).toBeNull();
+    // 印なしで組み立てた文脈（buildContextFrom 経由と同じ形）には印の行が無い
+    expect(buildContext(path)).not.toContain("relay mark");
   });
 });

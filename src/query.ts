@@ -135,6 +135,17 @@ export const contextOf = (chosen: Listed, fallbackCwd: string): string | null =>
  * **拾った時点で印を消す。** 渡し終えた印が残っていると、後の無関係な「続きから」まで
  * これを掴む。組み立てに失敗しても消す——直らない印を残すと、期限が切れるまで効き続ける。
  */
+/**
+ * 印で来たことを、受け取ったAIに名乗らせるための1行。
+ *
+ * 印は押しても画面が変わらず、拾われても黙って効く。**効いたことが誰にも見えない**
+ * ので、本人は本当に動いたのか分からない（本人の指摘 2026-09-09）。
+ * 最後の「まず一言だけ現在地を確認して」に乗せて、その一言に出させる。
+ */
+const MARK_NOTE =
+  "📌 この文脈は、本人が `relay mark` で「次はこれ」と指した会話です（探して選んだものではありません）。" +
+  "現在地を伝える一言に、印のついた会話を読んだことも添えてください。";
+
 export function markedContext(
   cwd: string,
   env: Readonly<Record<string, string | undefined>> = process.env,
@@ -145,7 +156,7 @@ export function markedContext(
   if (mark === null) return null;
   if (mark.id !== "" && mark.id === env["CLAUDE_CODE_SESSION_ID"]) return null;
   clearHandoff(file);
-  const context = buildContext(mark.path, readRepoSignals(mark.cwd === "" ? cwd : mark.cwd));
+  const context = buildContext(mark.path, readRepoSignals(mark.cwd === "" ? cwd : mark.cwd), MARK_NOTE);
   return context === null ? null : { path: mark.path, context };
 }
 
