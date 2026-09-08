@@ -10,6 +10,7 @@ export const USAGE = `会話を別スレッド／別ハーネスへ渡す
   relay --to codex           Codexで開く
   relay --print              文脈だけ出す（貼りたいとき）
   relay --print --previous   自分ではなく「直前の会話」を引く
+  relay mark                 いまの会話に「次はこれ」の印をつける（起動しない）
 
   relay --projects [件数]    プロジェクト単位の一覧（選ぶ単位はこちら）
   relay --list [件数]        いまいる場所の会話の一覧

@@ -1,0 +1,200 @@
+/** 「次はこの会話」の印。押した側が名指しするので、受け取る側は当て推量をしない。 */
+import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { HANDOFF_TTL_MS, type Handoff, clearHandoff, peekHandoff, putHandoff } from "../src/handoff.ts";
+import { markedContext } from "../src/query.ts";
+import { runMark } from "../src/mark-cli.ts";
+
+const roots: string[] = [];
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+
+const temp = (prefix: string): string => {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  roots.push(root);
+  return root;
+};
+
+const row = (o: unknown): string => JSON.stringify(o);
+
+const session = (cwd: string, texts: readonly string[]): string =>
+  texts
+    .map((text) =>
+      row({
+        type: "user",
+        sessionId: "s",
+        cwd,
+        promptSource: "typed",
+        origin: { kind: "human" },
+        timestamp: "2026-09-08T00:00:00Z",
+        message: { role: "user", content: text },
+      }),
+    )
+    .join("\n");
+
+/** 偽のセッション置き場。`<root>/-w/<name>.jsonl` に置く（Claude Codeと同じ形） */
+const fakeRoot = (files: Readonly<Record<string, readonly string[]>>, cwd = "/w"): string => {
+  const root = temp("relay-handoff-root-");
+  const dir = join(root, "-w");
+  mkdirSync(dir);
+  let ageMs = 0;
+  for (const [name, texts] of Object.entries(files)) {
+    const path = join(dir, `${name}.jsonl`);
+    writeFileSync(path, session(cwd, texts), "utf8");
+    const when = new Date(Date.now() - ageMs);
+    utimesSync(path, when, when);
+    ageMs += 10_000;
+  }
+  return root;
+};
+
+const markFile = (): string => join(temp("relay-handoff-"), "handoff");
+
+const mark = (over: Partial<Handoff> = {}): Handoff => ({
+  at: new Date().toISOString(),
+  id: "",
+  path: "",
+  cwd: "/w",
+  topic: "前の話",
+  ...over,
+});
+
+const someFile = (): string => {
+  const path = join(temp("relay-handoff-target-"), "a.jsonl");
+  writeFileSync(path, session("/w", ["前の話"]), "utf8");
+  return path;
+};
+
+describe("印の読み書き", () => {
+  it("正常系: 置いた印がそのまま読める", () => {
+    const file = markFile();
+    const path = someFile();
+    putHandoff(mark({ path, id: "abc", topic: "地図の話" }), file);
+    const got = peekHandoff(new Date(), file);
+    expect(got?.path).toBe(path);
+    expect(got?.id).toBe("abc");
+    expect(got?.topic).toBe("地図の話");
+  });
+
+  it("正常系: 押し直すと上書きされる（押し間違いの取り消しになる）", () => {
+    const file = markFile();
+    const first = someFile();
+    const second = someFile();
+    putHandoff(mark({ path: first }), file);
+    putHandoff(mark({ path: second }), file);
+    expect(peekHandoff(new Date(), file)?.path).toBe(second);
+  });
+
+  it("正常系: 印は本人しか読めない権限で書く（0600）", () => {
+    const file = markFile();
+    putHandoff(mark({ path: someFile() }), file);
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+  });
+
+  it("Edge: 印が無ければ null（読むだけで作らない）", () => {
+    expect(peekHandoff(new Date(), markFile())).toBeNull();
+  });
+
+  it("Edge: 期限を過ぎた印は無視する（忘れられた印に翌日を乗っ取らせない）", () => {
+    const file = markFile();
+    const path = someFile();
+    const now = new Date();
+    putHandoff(mark({ path, at: new Date(now.getTime() - HANDOFF_TTL_MS - 1000).toISOString() }), file);
+    expect(peekHandoff(now, file)).toBeNull();
+    // 境界のすぐ内側はまだ効く
+    putHandoff(mark({ path, at: new Date(now.getTime() - HANDOFF_TTL_MS + 1000).toISOString() }), file);
+    expect(peekHandoff(now, file)?.path).toBe(path);
+  });
+
+  it("Edge: 指す記録が消えていたら null（空の文脈を渡さない）", () => {
+    const file = markFile();
+    putHandoff(mark({ path: join(tmpdir(), "いない.jsonl") }), file);
+    expect(peekHandoff(new Date(), file)).toBeNull();
+  });
+
+  it("Error: 壊れた印でも落ちない", () => {
+    const file = markFile();
+    writeFileSync(file, "{これはJSONではない", "utf8");
+    expect(peekHandoff(new Date(), file)).toBeNull();
+  });
+
+  it("Error: 形は合っていても path が無ければ印として扱わない", () => {
+    const file = markFile();
+    writeFileSync(file, row({ at: new Date().toISOString(), topic: "path無し" }), "utf8");
+    expect(peekHandoff(new Date(), file)).toBeNull();
+  });
+
+  it("Corner: 消した印は残らない。無い印を消しても落ちない", () => {
+    const file = markFile();
+    putHandoff(mark({ path: someFile() }), file);
+    clearHandoff(file);
+    expect(peekHandoff(new Date(), file)).toBeNull();
+    expect(() => {
+      clearHandoff(file);
+    }).not.toThrow();
+  });
+});
+
+describe("markedContext: 受け取る側が印を拾う", () => {
+  it("正常系: 印がついた会話の原文が返り、印は消える", () => {
+    const file = markFile();
+    const path = someFile();
+    putHandoff(mark({ path, topic: "前の話" }), file);
+    const got = markedContext("/別の場所", {}, new Date(), file);
+    expect(got?.path).toBe(path);
+    expect(got?.context).toContain("前の話");
+    // 一度拾われたら消える（後の無関係な「続きから」が掴まないように）
+    expect(peekHandoff(new Date(), file)).toBeNull();
+    expect(markedContext("/別の場所", {}, new Date(), file)).toBeNull();
+  });
+
+  it("Corner: 印を置いた本人が読もうとしたら無視する（自分を読み返さない）", () => {
+    const file = markFile();
+    putHandoff(mark({ path: someFile(), id: "mine" }), file);
+    expect(markedContext("/w", { CLAUDE_CODE_SESSION_ID: "mine" }, new Date(), file)).toBeNull();
+    // 無視しただけなので印は残る。別のセッションが拾える
+    expect(markedContext("/w", { CLAUDE_CODE_SESSION_ID: "他" }, new Date(), file)?.context).toContain("前の話");
+  });
+
+  it("Edge: 印が無ければ null（呼んだ側は当て推量に落ちる）", () => {
+    expect(markedContext("/w", {}, new Date(), markFile())).toBeNull();
+  });
+});
+
+describe("relay mark: 押す側", () => {
+  it("正常系: IDが分かっていれば、その会話に印がつく", () => {
+    const file = markFile();
+    const root = fakeRoot({ mine: ["いま話している内容"], other: ["別の会話"] });
+    expect(runMark("/w", { CLAUDE_CODE_SESSION_ID: "mine" }, [root], file)).toBe(0);
+    const got = peekHandoff(new Date(), file);
+    expect(got?.path.endsWith("mine.jsonl")).toBe(true);
+    expect(got?.id).toBe("mine");
+    expect(got?.cwd).toBe("/w");
+    expect(got?.topic).toBe("いま話している内容");
+  });
+
+  it("Corner: 同じ場所で会話が2つ動いていても、IDが分かれば取り違えない", () => {
+    const file = markFile();
+    // newest の方が新しい。当て推量だとこちらを掴む
+    const root = fakeRoot({ newest: ["新しい方"], mine: ["こちらに印をつけたい"] });
+    runMark("/w", { CLAUDE_CODE_SESSION_ID: "mine" }, [root], file);
+    expect(peekHandoff(new Date(), file)?.topic).toBe("こちらに印をつけたい");
+  });
+
+  it("Edge: この場所に会話が無ければ印をつけず 1 を返す", () => {
+    const file = markFile();
+    expect(runMark("/どこでもない", {}, [temp("relay-empty-")], file)).toBe(1);
+    expect(peekHandoff(new Date(), file)).toBeNull();
+  });
+
+  it("正常系: 押した会話は、別の場所の新しいセッションからでも拾える", () => {
+    const file = markFile();
+    const root = fakeRoot({ mine: ["この続きをやりたい"] });
+    runMark("/w", { CLAUDE_CODE_SESSION_ID: "mine" }, [root], file);
+    const got = markedContext("/まったく別のリポジトリ", { CLAUDE_CODE_SESSION_ID: "新しい方" }, new Date(), file);
+    expect(got?.context).toContain("この続きをやりたい");
+  });
+});

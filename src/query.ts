@@ -8,6 +8,7 @@ import { type Memory, load, remember, remembered, save } from "./cache.ts";
 import { type Listed, describe, isSubagentRecord, pick } from "./list.ts";
 import { type Project, groupByProject, pickProject } from "./projects.ts";
 import { type BuiltContext, buildContext, buildContextFrom } from "./context.ts";
+import { clearHandoff, defaultHandoffPath, peekHandoff } from "./handoff.ts";
 import { readRepoSignals } from "./repo.ts";
 import { type KnownCwd, defaultRoots, peekOf, previousSessionsFor, recentSessions } from "./sessions.ts";
 
@@ -122,11 +123,36 @@ export const contextOf = (chosen: Listed, fallbackCwd: string): string | null =>
   buildContext(chosen.path, readRepoSignals(chosen.cwd ?? fallbackCwd));
 
 /**
+ * 印のついた会話。`relay mark` を押した側が名指ししたものなので、当て推量より先に見る。
+ *
+ * 印を置いた本人が読もうとしているときは無視する。自分を読み返すことになり、
+ * 「始まったばかりの空の自分を読む」のと同じ事故になるため。
+ *
+ * **拾った時点で印を消す。** 渡し終えた印が残っていると、後の無関係な「続きから」まで
+ * これを掴む。組み立てに失敗しても消す——直らない印を残すと、期限が切れるまで効き続ける。
+ */
+export function markedContext(
+  cwd: string,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  now: Date = new Date(),
+  file: string = defaultHandoffPath(),
+): BuiltContext | null {
+  const mark = peekHandoff(now, file);
+  if (mark === null) return null;
+  if (mark.id !== "" && mark.id === env["CLAUDE_CODE_SESSION_ID"]) return null;
+  clearHandoff(file);
+  const context = buildContext(mark.path, readRepoSignals(mark.cwd === "" ? cwd : mark.cwd));
+  return context === null ? null : { path: mark.path, context };
+}
+
+/**
  * 自分ではない「直前の会話」。中身のある最初の1本を返す。
+ * 印がついていればそれが最優先（当て推量をしない）。
  * 「続きから」の本命の経路なので、覚えている分は読み飛ばす（3.4秒かかっていた）。
  * 中身そのものは毎回読む——会話は続いているので、覚えたら古くなる。
  */
 export const previousIn = (cwd: string): BuiltContext | null =>
+  markedContext(cwd) ??
   buildContextFrom(
     previousSessionsFor(cwd, process.env, defaultRoots(), lookup(load())),
     readRepoSignals(cwd),

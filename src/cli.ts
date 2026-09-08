@@ -10,24 +10,23 @@
  *       いまの会話を新しいセッションで開く。
  *       --previous を付けると「自分ではなく直前の会話」を引く
  *       （新しいセッションが「続きから」と言われたときに使う）
+ *   relay mark                            いまの会話に「次はこれ」の印をつける
  *   show <session.jsonl>                  射影の中身を確かめる
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { quitQuietlyOnBrokenPipe } from "./pipe.ts";
 import { USAGE, unknownArg, wantsHelp } from "./usage.ts";
 import { install } from "./install.ts";
 import { runDeposits } from "./deposits-cli.ts";
 import { runDoctor } from "./doctor.ts";
 import { runUnread } from "./unread-cli.ts";
+import { runMark } from "./mark-cli.ts";
+import { runShow } from "./show-cli.ts";
 import { canvas, page, records } from "./exports.ts";
 import { groupByProject, pickProject, renderProjects } from "./projects.ts";
 import { buildContext } from "./context.ts";
 import { renderTable } from "./list.ts";
 import { pickInteractively } from "./run-picker.ts";
-import { extractSession, humanUtterances, parseJsonl } from "./extract.ts";
-import { extractGrok } from "./extract-grok.ts";
 import { readRepoSignals } from "./repo.ts";
 import { currentSessionFor } from "./sessions.ts";
 import {
@@ -38,31 +37,6 @@ import {
   previousIn,
   projectsOf,
 } from "./query.ts";
-
-function show(path: string): number {
-  // Grokのセッションはディレクトリ2ファイル構成。chat_history.jsonlを見せられたら隣のsummary.jsonも読む
-  const summaryPath = join(dirname(path), "summary.json");
-  const record = path.endsWith("chat_history.jsonl") && existsSync(summaryPath)
-    ? extractGrok(parseJsonl(readFileSync(path, "utf8")), readFileSync(summaryPath, "utf8"))
-    : extractSession(readFileSync(path, "utf8"));
-  if (record === null) {
-    process.stderr.write("形式を判定できませんでした\n");
-    return 1;
-  }
-  const human = humanUtterances(record);
-  process.stdout.write(
-    [
-      `harness   : ${record.harness}`,
-      `session   : ${record.sessionId ?? "-"}`,
-      `title     : ${record.title ?? "(なし)"}`,
-      `人間の発話: ${String(human.length)} 件 / ${String(Math.round(human.join("").length / 1024))} KB`,
-      `ファイル  : ${String(record.files.length)} 件  コマンド: ${String(record.commands.length)} 件`,
-      `結果の信号: ${String(record.turnEndings.length)} ターン分`,
-      "",
-    ].join("\n"),
-  );
-  return 0;
-}
 
 /** 直前の会話（自分ではない方）を引く。中身のある最初の1本を返す */
 function previousContext(cwd: string): string | null {
@@ -285,8 +259,10 @@ if (command === "install") {
   process.exitCode = await runDoctor();
 } else if (command === "unread") {
   process.exitCode = runUnread();
+} else if (command === "mark") {
+  process.exitCode = runMark();
 } else if (command === "show" && args[1] !== undefined) {
-  process.exitCode = show(args[1]);
+  process.exitCode = runShow(args[1]);
 } else {
   process.stderr.write(USAGE);
   process.exitCode = 2;
