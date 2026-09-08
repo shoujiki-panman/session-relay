@@ -40,12 +40,16 @@ const lookup =
   (path, mtimeMs) =>
     remembered(memory, path, mtimeMs)?.cwd ?? null;
 
-export function humanSessions(limit: number, onlyCwd: string | null): Listed[] {
+export function humanSessions(
+  limit: number,
+  onlyCwd: string | null,
+  roots: readonly string[] = defaultRoots(),
+): Listed[] {
   const memory = load();
   const knownCwd = lookup(memory);
   const rows: Listed[] = [];
   let learned = false;
-  for (const entry of recentSessions(undefined, SCAN_LIMIT, onlyCwd, knownCwd)) {
+  for (const entry of recentSessions(roots, SCAN_LIMIT, onlyCwd, knownCwd)) {
     const known = remembered(memory, entry.path, entry.mtimeMs);
     // 覚えていないものは、まず8KBだけ見て下請けの記録を落とす（深く読むのは人の会話だけ）
     if (known === null && isSubagentRecord(peekOf(entry.path))) continue;

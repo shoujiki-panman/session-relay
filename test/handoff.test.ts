@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { HANDOFF_TTL_MS, type Handoff, clearHandoff, peekHandoff, putHandoff } from "../src/handoff.ts";
 import { markedContext } from "../src/query.ts";
-import { runMark } from "../src/mark-cli.ts";
+import { runMark, runMarkCommand, runMarkShow } from "../src/mark-cli.ts";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -196,5 +196,62 @@ describe("relay mark: 押す側", () => {
     runMark("/w", { CLAUDE_CODE_SESSION_ID: "mine" }, [root], file);
     const got = markedContext("/まったく別のリポジトリ", { CLAUDE_CODE_SESSION_ID: "新しい方" }, new Date(), file);
     expect(got?.context).toContain("この続きをやりたい");
+  });
+});
+
+describe("relay mark --recent: cwdを持たない入口（Raycast等）", () => {
+  it("正常系: 場所を問わず、最後に人が打った会話に印がつく", () => {
+    const file = markFile();
+    // fakeRoot は先頭ほど新しい（10秒ずつ古くしている）
+    const root = fakeRoot({ newest: ["ついさっき話していた"], older: ["もっと前"] });
+    // cwd はホーム相当＝会話が1本も無い場所。--recent 無しでは失敗する場所
+    expect(runMark("/会話の無い場所", {}, [root], file, new Date(), true)).toBe(0);
+    expect(peekHandoff(new Date(), file)?.topic).toBe("ついさっき話していた");
+  });
+
+  it("Corner: --recent は場所を問わないので、cwdが違っても失敗しない", () => {
+    const file = markFile();
+    const root = fakeRoot({ mine: ["どこからでも拾える"] }, "/w");
+    expect(runMark("/まったく別の場所", {}, [root], file, new Date(), false)).toBe(1);
+    expect(runMark("/まったく別の場所", {}, [root], file, new Date(), true)).toBe(0);
+  });
+
+  it("Corner: --recent の印には id を書かない（押した人の会話とは限らないため）", () => {
+    const file = markFile();
+    const root = fakeRoot({ mine: ["最後の会話"] });
+    runMark("/w", { CLAUDE_CODE_SESSION_ID: "押した人" }, [root], file, new Date(), true);
+    expect(peekHandoff(new Date(), file)?.id).toBe("");
+  });
+
+  it("Corner: 印の場所は会話自身のcwd（gitの欄をそこから採るため）", () => {
+    const file = markFile();
+    const root = fakeRoot({ mine: ["会話の場所は /w"] }, "/w");
+    runMark("/押した場所は別", {}, [root], file, new Date(), true);
+    expect(peekHandoff(new Date(), file)?.cwd).toBe("/w");
+  });
+
+  it("Edge: 記録が1つも無ければ印をつけず 1 を返す", () => {
+    const file = markFile();
+    expect(runMark("/w", {}, [temp("relay-empty-recent-")], file, new Date(), true)).toBe(1);
+    expect(peekHandoff(new Date(), file)).toBeNull();
+  });
+});
+
+describe("印を確かめる口（押しても画面が変わらないので要る）", () => {
+  it("正常系: 印があれば見出しを出して 0", () => {
+    const file = markFile();
+    putHandoff(mark({ path: someFile(), topic: "確かめたい話" }), file);
+    expect(runMarkShow(file)).toBe(0);
+  });
+
+  it("Edge: 印が無ければ 1（フックから呼んでも黙って成功しない）", () => {
+    expect(runMarkShow(markFile())).toBe(1);
+  });
+});
+
+describe("relay mark の引数", () => {
+  it("Error: 知らない指定は読み飛ばさず 2 を返す（別の会話に印がつくのを防ぐ）", () => {
+    expect(runMarkCommand(["--recnt"])).toBe(2);
+    expect(runMarkCommand(["--all"])).toBe(2);
   });
 });

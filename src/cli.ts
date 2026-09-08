@@ -20,7 +20,7 @@ import { install } from "./install.ts";
 import { runDeposits } from "./deposits-cli.ts";
 import { runDoctor } from "./doctor.ts";
 import { runUnread } from "./unread-cli.ts";
-import { runMark } from "./mark-cli.ts";
+import { runMarkCommand } from "./mark-cli.ts";
 import { runShow } from "./show-cli.ts";
 import { canvas, page, records } from "./exports.ts";
 import { groupByProject, pickProject, renderProjects } from "./projects.ts";
@@ -260,7 +260,7 @@ if (command === "install") {
 } else if (command === "unread") {
   process.exitCode = runUnread();
 } else if (command === "mark") {
-  process.exitCode = runMark();
+  process.exitCode = runMarkCommand(args.slice(1));
 } else if (command === "show" && args[1] !== undefined) {
   process.exitCode = runShow(args[1]);
 } else {

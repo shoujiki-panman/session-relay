@@ -100,6 +100,8 @@ relay --to codex         Codexで開く
 relay --print            文脈だけ出す（貼りたいとき）
 relay --print --previous 自分ではなく「直前の会話」を引く
 relay mark               いまの会話に「次はこれ」の印をつける（起動しない）
+relay mark --recent      場所を問わず、最後に動いていた会話に印をつける
+relay mark --show        いま印がついている会話を見る
 
 relay --pick             その場で選ぶ（↑↓ / 打つと絞る / Enter / Esc）
 relay --pick mulmo       検索語つきで開く
@@ -162,6 +164,27 @@ relay mark      # いまの会話に「次はこれ」の印をつける
 拾われないまま忘れられた印は24時間で失効する。押し直せば上書きなので、押し間違いはもう一度押せば直る。
 
 印は場所をまたぐ。プロジェクトAで押して、プロジェクトBの新しいセッションで受け取れる。
+
+押す入口はMulmoTerminalに限らない。**どこで押すかで、会話の特定のしかたが変わる**。
+
+| 入口 | どの会話に付くか |
+|---|---|
+| Claude Codeの中（`!relay mark` と打つ／AIに「印をつけて」と言う） | セッションIDが環境変数で渡るので取り違えない |
+| MulmoTerminalのヘッダーボタン（`CLAUDE_CODE_SESSION_ID=${session} relay mark`） | 同じく取り違えない |
+| 素のシェル・alias | その場所で一番新しい会話（同じ場所で2つ動かしていると外れる） |
+| **Raycast等のランチャー（`relay mark --recent`）** | 場所を問わず、最後に動いていた会話 |
+
+`--recent` があるのは、**ランチャーがカレントディレクトリを持たないから**。
+そこから見た「いまの会話」は「この場所の会話」ではなく「最後に動いていた会話」になる
+（`codex resume --last` と同じ割り切り）。
+
+Raycastに登録するなら `examples/raycast/` を Script Directory に追加する
+（Raycast → Extensions → Script Commands → Add Script Directory）。
+実測: Raycastが渡すPATH（`/usr/bin:/bin:/usr/sbin:/sbin`）では**nodeが見つからない**ので、
+同梱のスクリプトはPATHを足してから `relay` を呼んでいる。
+
+**押しても画面は変わらない。** 効いたかどうかは `relay mark --show` で見る
+（印があれば見出しと時刻を出し、無ければ 1 を返す）。
 
 ### 同じハーネスの続きなら、標準のほうが素直
 

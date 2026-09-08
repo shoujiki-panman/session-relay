@@ -254,6 +254,16 @@
   - テスト**277件**緑（+16）／破壊テスト4件とも赤を確認（印を消さない・本人チェックを外す・期限を見ない・記録の存在を見ない → それぞれ1件red、戻すと緑）
   - **実機で通し確認**: この会話で `relay mark` → **別のディレクトリ・別のセッションID**から `relay --print --previous` → 4.8KBの射影が返り、印は消えた
 
+- [x] 🚀 **`relay mark --recent` と Raycast 用スクリプトを追加**（2026-09-09・本人「raycastに登録する」）
+  - 🐛 **Raycastはカレントディレクトリを持たない**。`relay mark` は「この場所の会話」を探す作りなので、cwd=~ で実測 exit 1。ランチャーからは動かなかった
+  - `--recent`: 場所を問わず「最後に人が打った会話」に印をつける（`codex resume --last` と同じ割り切り）。`humanSessions` に roots を渡せるようにして実現
+  - `--recent` の印には **id を書かない**（押した人の会話とは限らない）。場所は会話自身の cwd を使う（gitの欄がそこから採られる）
+  - 🐛 **RaycastのPATHではnodeが見つからない**（実測: `/usr/bin:/bin:/usr/sbin:/sbin` で `command -v node` が空）。同梱スクリプトでPATHを足してから呼ぶ
+  - `relay mark --show`: いま印がついている会話を1行で見る。**押しても画面が変わらない**ので、効いたか確かめる口が無いと分からない（本人「見えない機能だから伝わりにくい」）
+  - `relay mark` の引数は読み飛ばさず検証する（`--recnt` が別の会話に印をつけて終わるのを防ぐ）
+  - テスト**285件**緑（+8）。実機で **Raycast相当の条件**（cwd=/ ・最小PATH・Claudeの環境変数なし）で実行し、正しい会話に印がつくことを確認
+  - ⚠️ Raycastへの**ディレクトリ登録は本人の手**（Raycastの設定UIからしかできない）。まだ登録していない
+
 ## 🔨 いまやっていること（公開の残り）
 - [x] tarball実機テスト → GitHubへコミット・push
 - [x] Zenn記事published（2026-09-01）: https://zenn.dev/shoujiki_panman/articles/session-relay-no-handoff ／READMEも読者の場面から始まる構成に改稿
