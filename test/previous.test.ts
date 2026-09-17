@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildContextFrom } from "../src/context.ts";
-import { previousSessionsFor, sessionsFor } from "../src/sessions.ts";
+import { currentSessionFor, previousSessionsFor, sessionsFor } from "../src/sessions.ts";
 
 const row = (o: unknown): string => JSON.stringify(o);
 
@@ -57,6 +57,59 @@ describe("previousSessionsFor: 自分を除いた直前の会話", () => {
   it("正常系: sessionsFor は自分も含めて新しい順に返す", () => {
     const root = fakeRoot({ mine: [0, ["a"]], prev: [10_000, ["b"]] });
     expect(names(sessionsFor("/w", [root]))).toEqual(["mine", "prev"]);
+  });
+});
+
+/**
+ * 同じフォルダで Claude と Codex を並べている状況を作る。
+ * **Claude のほうが新しい**——向こうは絶えず書いているので、実際こうなる。
+ */
+const bothHarnesses = (): { roots: string[]; base: string } => {
+  const base = mkdtempSync(join(tmpdir(), "relay-harness-"));
+  const claudeRoot = join(base, ".claude", "projects");
+  const codexRoot = join(base, ".codex", "sessions");
+  const claudeDir = join(claudeRoot, "-w");
+  const codexDir = join(codexRoot, "2026", "09", "17");
+  mkdirSync(claudeDir, { recursive: true });
+  mkdirSync(codexDir, { recursive: true });
+  const put = (dir: string, name: string, ageMs: number, text: string): void => {
+    const path = join(dir, `${name}.jsonl`);
+    writeFileSync(path, session([text]), "utf8");
+    const when = new Date(Date.now() - ageMs);
+    utimesSync(path, when, when);
+  };
+  put(claudeDir, "claude-now", 0, "Claudeで進めている話");
+  put(codexDir, "rollout-2026-09-17T00-00-00-abcdef12", 20_000, "Codexで進めている話");
+  put(claudeDir, "claude-old", 90_000, "前のClaudeの話");
+  return { roots: [claudeRoot, codexRoot], base };
+};
+
+const nameOf = (path: string | null): string =>
+  path === null ? "(なし)" : (path.split("/").pop() ?? "").replace(".jsonl", "");
+
+describe("RELAY_HARNESS: いま居るハーネスを名乗れる（Codexから押せるようにするため）", () => {
+  it("正常系: codex と名乗れば、Claudeのほうが新しくてもCodexの記録を掴む", () => {
+    const { roots } = bothHarnesses();
+    const got = currentSessionFor("/w", { RELAY_HARNESS: "codex" }, roots);
+    expect(nameOf(got)).toContain("rollout-");
+  });
+  it("Corner: 名乗りが無ければ今までどおり、一番新しいものを掴む（＝Claudeを掴む）", () => {
+    const { roots } = bothHarnesses();
+    expect(nameOf(currentSessionFor("/w", {}, roots))).toBe("claude-now");
+  });
+  it("Corner: IDが分かっているときは、名乗りよりIDが勝つ", () => {
+    const { roots } = bothHarnesses();
+    const got = currentSessionFor("/w", { RELAY_HARNESS: "codex", CLAUDE_CODE_SESSION_ID: "claude-old" }, roots);
+    expect(nameOf(got)).toBe("claude-old");
+  });
+  it("Edge: 知らない名前は名乗っていない扱い（勝手に空にしない）", () => {
+    const { roots } = bothHarnesses();
+    expect(nameOf(currentSessionFor("/w", { RELAY_HARNESS: "そんなものは無い" }, roots))).toBe("claude-now");
+  });
+  it("正常系: 直前の会話では、自分（Codexの最新）は外すが、Claudeの会話は候補に残す", () => {
+    const { roots } = bothHarnesses();
+    const got = previousSessionsFor("/w", { RELAY_HARNESS: "codex" }, roots);
+    expect(names(got)).toEqual(["claude-now", "claude-old"]);
   });
 });
 

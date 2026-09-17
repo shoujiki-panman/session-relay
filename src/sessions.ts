@@ -11,6 +11,30 @@ const codexRoot = (): string => join(homedir(), ".codex", "sessions");
 /** 会話の記録が置かれている場所。ハーネスが増えたらここに足す */
 export const defaultRoots = (): string[] => [claudeRoot(), codexRoot()];
 
+/** ハーネスの名前 → その置き場の末尾。`RELAY_HARNESS` の値と突き合わせる */
+const HARNESS_TAIL: Readonly<Record<string, string>> = {
+  claude: join(".claude", "projects"),
+  codex: join(".codex", "sessions"),
+};
+
+/**
+ * 「いま自分が居るハーネス」の置き場。分からなければ null。
+ *
+ * Claude Code は `CLAUDE_CODE_SESSION_ID` を渡してくるので迷わないが、
+ * **Codex は何も渡してこない**（codex-cli 0.147.0 で実測）。同じフォルダで
+ * Claude と Codex を並べていると、更新時刻で選ぶかぎり**必ず Claude を掴む**
+ * ——向こうは絶えず書いているため。呼ぶ側（MulmoTerminal のボタン）が
+ * `RELAY_HARNESS=codex` と名乗れるようにして、その置き場だけを見る。
+ */
+function harnessRootOf(
+  env: Readonly<Record<string, string | undefined>>,
+  roots: readonly string[],
+): string | null {
+  const tail = HARNESS_TAIL[(env["RELAY_HARNESS"] ?? "").toLowerCase()];
+  if (tail === undefined) return null;
+  return roots.find((root) => root.endsWith(tail)) ?? null;
+}
+
 /** 掘る深さの上限。Claudeは1階層、Codexは3階層（YYYY/MM/DD） */
 const MAX_DEPTH = 4;
 
@@ -169,7 +193,9 @@ export function sessionsFor(
  * 同じディレクトリで会話を2つ動かしていると、更新時刻だけでは取り違える
  * （実測: 17秒新しいだけの別の会話を掴んだ）。
  * Claude Codeは `CLAUDE_CODE_SESSION_ID` を渡してくるので、あるなら必ずそれを使う。
- * Codexは渡してこない（codex-cli 0.147.0 で実測）ので、当て推量に頼るしかない。
+ * Codexは渡してこない（codex-cli 0.147.0 で実測）ので、`RELAY_HARNESS=codex` と
+ * 名乗ってもらい、**そのハーネスの置き場だけ**を見る。名乗りが無ければ今までどおり
+ * 全部から一番新しいものを選ぶ（当て推量）。
  */
 export function currentSessionFor(
   cwd: string,
@@ -178,7 +204,9 @@ export function currentSessionFor(
 ): string | null {
   const id = env["CLAUDE_CODE_SESSION_ID"];
   const byId = id === undefined || id === "" ? null : findSessionById(roots, id);
-  return byId ?? sessionsFor(cwd, roots)[0] ?? null;
+  if (byId !== null) return byId;
+  const mine = harnessRootOf(env, roots);
+  return sessionsFor(cwd, mine === null ? roots : [mine])[0] ?? null;
 }
 
 /**
@@ -199,5 +227,10 @@ export function previousSessionsFor(
   const id = env["CLAUDE_CODE_SESSION_ID"];
   const self = id === undefined || id === "" ? null : findSessionById(roots, id);
   if (self !== null) return all.filter((path) => path !== self);
-  return env["CLAUDECODE"] === undefined ? all : all.slice(1);
+  if (env["CLAUDECODE"] !== undefined) return all.slice(1);
+  // 名乗りがあるなら、自分は**そのハーネスの一番新しい1本**。他のハーネスの会話は
+  // 候補に残す（Codexから「Claudeでやっていた続き」を引くのが、この道具の用途）。
+  const mine = harnessRootOf(env, roots);
+  const here = mine === null ? undefined : all.find((path) => path.startsWith(mine));
+  return here === undefined ? all : all.filter((path) => path !== here);
 }
