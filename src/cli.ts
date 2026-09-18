@@ -6,7 +6,7 @@
  *   relay --pick [検索語] [--all]       その場で選ぶ（↑↓・打つと絞る・Enter・Esc）
  *   relay --list [件数] [--all] [--in <#|名前>]
  *                                       会話の一覧。--in でプロジェクトを絞る
- *   relay [--to claude|codex] [--print] [--previous] [--from <#|ref>]
+ *   relay [--to claude|codex] [--model <名前>] [--print] [--previous] [--from <#|ref>]
  *       いまの会話を新しいセッションで開く。
  *       --previous を付けると「自分ではなく直前の会話」を引く
  *       （新しいセッションが「続きから」と言われたときに使う）
@@ -14,6 +14,7 @@
  *   show <session.jsonl>                  射影の中身を確かめる
  */
 import { spawnSync } from "node:child_process";
+import { type Destination, describeLaunch, destinationOf, launchArgs } from "./launch.ts";
 import { quitQuietlyOnBrokenPipe } from "./pipe.ts";
 import { USAGE, unknownArg, wantsHelp } from "./usage.ts";
 import { install } from "./install.ts";
@@ -158,7 +159,7 @@ async function chooseContext(
 }
 
 async function relay(
-  target: string,
+  to: Destination,
   printOnly: boolean,
   usePrevious: boolean,
   from: string | null,
@@ -176,9 +177,9 @@ async function relay(
     return 0;
   }
   process.stderr.write(
-    `${target} を新しいセッションで開きます（文脈 ${String(Math.round(context.length / 1024))} KB）\n`,
+    `${describeLaunch(to)} を新しいセッションで開きます（文脈 ${String(Math.round(context.length / 1024))} KB）\n`,
   );
-  const result = spawnSync(target, [context], { stdio: "inherit" });
+  const result = spawnSync(to.target, launchArgs(to, context), { stdio: "inherit" });
   return result.status ?? 1;
 }
 
@@ -206,8 +207,7 @@ if (command === "install") {
     process.stderr.write(`知らない指定です: ${unknown}\n\n${USAGE}`);
     process.exit(2);
   }
-  const toIndex = args.indexOf("--to");
-  const target = toIndex >= 0 ? (args[toIndex + 1] ?? "claude") : "claude";
+  const to = destinationOf(args);
   const fromIndex = args.indexOf("--from");
   const from = fromIndex >= 0 ? (args[fromIndex + 1] ?? null) : null;
   const inIndex = args.indexOf("--in");
@@ -245,7 +245,7 @@ if (command === "install") {
       all: args.includes("--all"),
     };
     process.exitCode = await relay(
-      target,
+      to,
       args.includes("--print"),
       args.includes("--previous"),
       from,

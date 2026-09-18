@@ -8,6 +8,7 @@ export const USAGE = `会話を別スレッド／別ハーネスへ渡す
 
   relay                      いまの会話を新しいClaudeセッションで開く
   relay --to codex           Codexで開く
+  relay --to codex --model <名前>  モデルを指定して開く（重いモデルで決めて、軽いモデルで回す）
   relay --print              文脈だけ出す（貼りたいとき）
   relay --print --previous   自分ではなく「直前の会話」を引く
   relay mark                 いまの会話に「次はこれ」の印をつける（起動しない）
@@ -37,6 +38,7 @@ export const USAGE = `会話を別スレッド／別ハーネスへ渡す
 /** 値を取るフラグ。次の引数は値なので、フラグとして検査しない */
 const TAKES_VALUE = new Set([
   "--to",
+  "--model",
   "--from",
   "--in",
   "--projects",
