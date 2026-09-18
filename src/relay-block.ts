@@ -6,6 +6,7 @@
  * 放置すると渡すたびに入れ子になって膨らむので、
  * ここで元の発話の並びに畳み直す。
  */
+import { asString, isRecord } from "./types.ts";
 
 /** 文脈ブロックの目印。context.ts が書く見出しと必ず同じにすること */
 export const RELAY_HEADER = "# 前の会話の記録（要約なし・本人の発話は原文のまま）";
@@ -74,4 +75,19 @@ export function parseRelayContext(text: string): RelayBlock | null {
     files: bulletItems(sectionAfter(lines, FILES_SECTION)),
     commands: bulletItems(sectionAfter(lines, COMMANDS_SECTION)),
   };
+}
+
+/**
+ * 記録に残ったフックの標準出力から、文脈を取り出す。
+ * JSON形式（いま）と素の文脈（0.2.x までの形）の両方を読む。どちらでもなければそのまま返す。
+ */
+export function unwrapHookStdout(stdout: string): string {
+  if (!stdout.trimStart().startsWith("{")) return stdout;
+  try {
+    const value: unknown = JSON.parse(stdout);
+    const specific = isRecord(value) ? value["hookSpecificOutput"] : null;
+    return (isRecord(specific) ? asString(specific["additionalContext"]) : null) ?? stdout;
+  } catch {
+    return stdout;
+  }
 }

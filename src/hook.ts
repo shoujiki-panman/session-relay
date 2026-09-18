@@ -16,6 +16,7 @@ import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { buildContext } from "./context.ts";
 import { clearHandoff, defaultHandoffPath, peekHandoff, putHandoff } from "./handoff.ts";
+import { parseRelayContext } from "./relay-block.ts";
 import { readRepoSignals } from "./repo.ts";
 import { asString, isRecord } from "./types.ts";
 
@@ -81,10 +82,32 @@ function recall(input: HookInput, now: Date, dir?: string): string {
   return buildContext(slot.path, readRepoSignals(input.cwd), CLEAR_NOTE) ?? "";
 }
 
+/**
+ * 本人の画面に出す一行。`/clear` で画面が真っ白になると「消えた」と感じる（本人の言葉:
+ * 「文章が消えるからビビるな」）。文脈はAIにしか見えないので、入ったことを人にも見せる。
+ */
+export function notice(context: string): string {
+  const count = parseRelayContext(context)?.utterances.length ?? 0;
+  const kb = Math.max(1, Math.round(Buffer.byteLength(context, "utf8") / 1024));
+  return `relay: 前の会話を引き継ぎました（本人の発話 ${String(count)}件・${String(kb)}KB）。消えたのは画面だけで、記録は残っています`;
+}
+
+/**
+ * 文脈をAIに、一行を本人に。素の標準出力だとAIにしか届かないので、フックのJSON形式で出す
+ * （実測 2026-09-18: systemMessage は画面に、additionalContext は文脈に入る）。
+ */
+export const wrapForClaude = (context: string): string =>
+  JSON.stringify({
+    systemMessage: notice(context),
+    hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: context },
+  });
+
 /** フックの入力を受けて、標準出力に出す文字列を返す（出すものが無ければ空） */
 export function runHook(raw: string, now: Date = new Date(), dir?: string): string {
   const input = parseHookInput(raw);
   if (input === null || input.trigger !== "clear") return "";
   if (input.event === "SessionEnd") remember(input, now, dir);
-  return input.event === "SessionStart" ? recall(input, now, dir) : "";
+  if (input.event !== "SessionStart") return "";
+  const context = recall(input, now, dir);
+  return context === "" ? "" : wrapForClaude(context);
 }

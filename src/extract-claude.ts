@@ -1,5 +1,5 @@
 import { classifyUtterance } from "./parse.ts";
-import { parseRelayContext } from "./relay-block.ts";
+import { parseRelayContext, unwrapHookStdout } from "./relay-block.ts";
 import { type TurnAcc, emptyTurnAcc, endTurn, finishTurns, noteAssistantText } from "./turns.ts";
 import {
   type Row,
@@ -87,7 +87,7 @@ function applyUserRow(row: Row, acc: Acc): void {
 function applyAttachmentRow(row: Row, acc: Acc): void {
   const attachment = row["attachment"];
   if (!isRecord(attachment) || attachment["type"] !== "hook_success") return;
-  const stdout = asString(attachment["stdout"]) ?? "";
+  const stdout = unwrapHookStdout(asString(attachment["stdout"]) ?? "");
   if (parseRelayContext(stdout) === null) return;
   acc.utterances.push(...expandRelayed(stdout, asString(row["timestamp"]), acc, 0));
 }

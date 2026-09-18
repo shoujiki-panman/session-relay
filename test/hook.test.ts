@@ -3,8 +3,9 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { CLEAR_NOTE, SLOT_TTL_MS, parseHookInput, runHook, slotFor } from "../src/hook.ts";
-import { isRelayContext } from "../src/relay-block.ts";
+import { CLEAR_NOTE, SLOT_TTL_MS, notice, parseHookInput, runHook, slotFor } from "../src/hook.ts";
+import { isRelayContext, unwrapHookStdout } from "../src/relay-block.ts";
+import { isRecord } from "../src/types.ts";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -36,7 +37,7 @@ describe("/clear の前後をつなぐ", () => {
     const dir = temp();
     const old = session(dir, "/w", ["地図の色を羊皮紙にしたい", "ボタンは臙脂で"]);
     expect(runHook(input("SessionEnd", { reason: "clear" }, "/w", old), T0, dir)).toBe("");
-    const out = runHook(input("SessionStart", { source: "clear" }, "/w"), after(2000), dir);
+    const out = unwrapHookStdout(runHook(input("SessionStart", { source: "clear" }, "/w"), after(2000), dir));
     expect(isRelayContext(out)).toBe(true);
     expect(out).toContain("地図の色を羊皮紙にしたい");
     expect(out).toContain("ボタンは臙脂で");
@@ -65,6 +66,29 @@ describe("/clear の前後をつなぐ", () => {
     runHook(input("SessionEnd", { reason: "clear" }, "/w", old), T0, dir);
     expect(runHook(input("SessionStart", { source: "clear" }, "/w"), after(SLOT_TTL_MS + 1), dir)).toBe("");
     expect(existsSync(slotFor("/w", dir))).toBe(false);
+  });
+});
+
+describe("引き継いだことを本人の画面にも出す", () => {
+  it("文脈はAIに、一行は本人に（フックのJSON形式）", () => {
+    const dir = temp();
+    const old = session(dir, "/w", ["地図の色を羊皮紙にしたい", "ボタンは臙脂で"]);
+    runHook(input("SessionEnd", { reason: "clear" }, "/w", old), T0, dir);
+    const out = runHook(input("SessionStart", { source: "clear" }, "/w"), after(1000), dir);
+    const parsed: unknown = JSON.parse(out);
+    const message = isRecord(parsed) ? parsed["systemMessage"] : null;
+    expect(message).toContain("本人の発話 2件");
+    expect(unwrapHookStdout(out)).toContain("ボタンは臙脂で");
+  });
+
+  it("一行には件数と大きさが入り、1KB未満でも0KBとは書かない", () => {
+    expect(notice("短い")).toContain("0件・1KB");
+  });
+
+  it("素の文脈（以前の形）とJSONでない出力は、そのまま返す", () => {
+    expect(unwrapHookStdout("caffeinate started")).toBe("caffeinate started");
+    expect(unwrapHookStdout("{ 壊れたJSON")).toBe("{ 壊れたJSON");
+    expect(unwrapHookStdout(JSON.stringify({ other: 1 }))).toBe(JSON.stringify({ other: 1 }));
   });
 });
 
