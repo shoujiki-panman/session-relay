@@ -32,6 +32,8 @@ export const USAGE = `会話を別スレッド／別ハーネスへ渡す
   relay install [--dry-run]  MCPとスキルをまとめて登録する
   relay doctor               登録と生存を1コマンドで検査する（繋がらない時に）
   relay hook                 Claude Codeのフック用。/clear の前後をつなぎ、同じ画面のまま会話を軽くする
+                             （Stopに入れると、会話が育ったとき「いま区切るといい」を画面に出す。
+                               閾値は RELAY_NUDGE_TOKENS、既定30万）
   relay unread               未読の投函を1行で知らせる（起動時フック用）
   relay show <path>          射影の中身を確かめる
 `;

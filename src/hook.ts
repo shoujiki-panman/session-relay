@@ -8,6 +8,7 @@
  * Claude Codeのフックに乗る。本人が打つのは `/clear` だけ:
  *   SessionEnd（reason=clear）   … 終わる会話の記録の場所を控える
  *   SessionStart（source=clear） … 控えた会話の文脈を標準出力に出す（＝新しい会話に入る）
+ *   Stop                         … 会話が育っていたら「いま区切るといい」を画面に出す
  *
  * **フックは何があっても失敗させない。** ここで落ちると `/clear` のたびに赤い字が出る。
  * 分からない入力・控えが無い・期限切れは、どれも黙って何も出さない。
@@ -16,6 +17,7 @@ import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { buildContext } from "./context.ts";
 import { clearHandoff, defaultHandoffPath, peekHandoff, putHandoff } from "./handoff.ts";
+import { forgetNudge, nudge } from "./nudge.ts";
 import { parseRelayContext } from "./relay-block.ts";
 import { readRepoSignals } from "./repo.ts";
 import { asString, isRecord } from "./types.ts";
@@ -102,11 +104,23 @@ export const wrapForClaude = (context: string): string =>
     hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: context },
   });
 
+/** 返事が終わったとき。会話が育っていたら「いま区切るといい」を本人の画面に出す（nudge.ts） */
+function afterReply(input: HookInput, now: Date, dir: string): string {
+  const message = nudge(input.transcriptPath, input.sessionId, dir, undefined, now);
+  return message === "" ? "" : JSON.stringify({ systemMessage: message });
+}
+
 /** フックの入力を受けて、標準出力に出す文字列を返す（出すものが無ければ空） */
 export function runHook(raw: string, now: Date = new Date(), dir?: string): string {
   const input = parseHookInput(raw);
-  if (input === null || input.trigger !== "clear") return "";
-  if (input.event === "SessionEnd") remember(input, now, dir);
+  if (input === null) return "";
+  const stateDir = dir ?? dirname(defaultHandoffPath());
+  if (input.event === "Stop") return afterReply(input, now, stateDir);
+  if (input.trigger !== "clear") return "";
+  if (input.event === "SessionEnd") {
+    remember(input, now, dir);
+    forgetNudge(stateDir, input.sessionId);
+  }
   if (input.event !== "SessionStart") return "";
   const context = recall(input, now, dir);
   return context === "" ? "" : wrapForClaude(context);
