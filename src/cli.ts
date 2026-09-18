@@ -14,6 +14,8 @@
  *   show <session.jsonl>                  射影の中身を確かめる
  */
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { runHook } from "./hook.ts";
 import { type Destination, describeLaunch, destinationOf, launchArgs } from "./launch.ts";
 import { quitQuietlyOnBrokenPipe } from "./pipe.ts";
 import { USAGE, unknownArg, wantsHelp } from "./usage.ts";
@@ -259,6 +261,13 @@ if (command === "install") {
   process.exitCode = await runDoctor();
 } else if (command === "unread") {
   process.exitCode = runUnread();
+} else if (command === "hook") {
+  // フックは何があっても失敗させない（/clear のたびに赤い字を出さない）
+  try {
+    process.stdout.write(runHook(readFileSync(0, "utf8")));
+  } catch {
+    // 黙る
+  }
 } else if (command === "mark") {
   process.exitCode = runMarkCommand(args.slice(1));
 } else if (command === "show" && args[1] !== undefined) {

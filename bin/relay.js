@@ -7,6 +7,7 @@
  *   relay mcp-deposit         会話を預けるだけのMCP（外向き候補）
  *   relay mcp-deposit-http    Cloudflare Access必須のリモート投函口
  *   relay mark                いまの会話に「次はこれ」の印をつける（起動しない）
+ *   relay hook                Claude Codeのフック用（/clear の前後をつなぐ）
  *   relay show <session.jsonl>
  *
  * **手元では src と dist の新しい方を読む。** 配布物には src が入っていない
@@ -52,6 +53,6 @@ const entry =
         ? "deposit-http-main"
         : "cli";
 // cli 側は先頭に「何をするか」を要求する。`relay --print` のように省かれたら足す
-if (entry === "cli" && !["show", "install", "deposits", "doctor", "unread", "mark"].includes(args[0])) process.argv.splice(2, 0, "relay");
+if (entry === "cli" && !["show", "install", "deposits", "doctor", "unread", "mark", "hook"].includes(args[0])) process.argv.splice(2, 0, "relay");
 
 await import(pathToFileURL(join(dir, `${entry}.${ext}`)).href);

@@ -1,5 +1,5 @@
 import { classifyUtterance } from "./parse.ts";
-import { parseRelayContext } from "./relay-block.ts";
+import { parseRelayContext, unwrapHookStdout } from "./relay-block.ts";
 import { type TurnAcc, emptyTurnAcc, endTurn, finishTurns, noteAssistantText } from "./turns.ts";
 import {
   type Row,
@@ -79,6 +79,19 @@ function applyUserRow(row: Row, acc: Acc): void {
   }
 }
 
+/**
+ * `/clear` のフック（hook.ts）が入れた文脈。発話ではなく添付として記録される（実測 2026-09-18）。
+ * ここを読まないと、2回目の `/clear` で**最初の会話が丸ごと落ちる**（実測で落ちた）。
+ * relayの文脈ブロックでない添付（他のフックの出力）は発話にしない。
+ */
+function applyAttachmentRow(row: Row, acc: Acc): void {
+  const attachment = row["attachment"];
+  if (!isRecord(attachment) || attachment["type"] !== "hook_success") return;
+  const stdout = unwrapHookStdout(asString(attachment["stdout"]) ?? "");
+  if (parseRelayContext(stdout) === null) return;
+  acc.utterances.push(...expandRelayed(stdout, asString(row["timestamp"]), acc, 0));
+}
+
 function collectToolUse(block: Row, acc: Acc): void {
   const name = asString(block["name"]);
   if (name !== null) acc.tools.add(name);
@@ -116,6 +129,7 @@ function applyRow(row: Row, acc: Acc): void {
   if (type === "custom-title") acc.title ??= asString(row["customTitle"]);
   else if (type === "user") applyUserRow(row, acc);
   else if (type === "assistant") applyAssistantRow(row, acc);
+  else if (type === "attachment") applyAttachmentRow(row, acc);
 }
 
 export function extractClaude(rows: readonly Row[]): SessionRecord {
