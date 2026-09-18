@@ -9,6 +9,7 @@
  *   SessionEnd（reason=clear）   … 終わる会話の記録の場所を控える
  *   SessionStart（source=clear） … 控えた会話の文脈を標準出力に出す（＝新しい会話に入る）
  *   Stop                         … 会話が育っていたら「いま区切るといい」を画面に出す
+ *   PostToolUse                  … 下請けに出さず道具を続けていたら、AIの文脈に一行足す
  *
  * **フックは何があっても失敗させない。** ここで落ちると `/clear` のたびに赤い字が出る。
  * 分からない入力・控えが無い・期限切れは、どれも黙って何も出さない。
@@ -16,6 +17,7 @@
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { buildContext } from "./context.ts";
+import { delegateNudge, forgetDelegate } from "./delegate-nudge.ts";
 import { clearHandoff, defaultHandoffPath, peekHandoff, putHandoff } from "./handoff.ts";
 import { forgetNudge, nudge } from "./nudge.ts";
 import { parseRelayContext } from "./relay-block.ts";
@@ -38,6 +40,10 @@ export interface HookInput {
   readonly sessionId: string;
   readonly transcriptPath: string;
   readonly cwd: string;
+  /** PostToolUse の tool_name */
+  readonly toolName: string;
+  /** サブエージェントの中から来たときだけ入る（公式: main-thread の判別に使う） */
+  readonly agentId: string;
 }
 
 export function parseHookInput(raw: string): HookInput | null {
@@ -48,15 +54,19 @@ export function parseHookInput(raw: string): HookInput | null {
     return null;
   }
   if (!isRecord(value)) return null;
-  const event = asString(value["hook_event_name"]);
-  const cwd = asString(value["cwd"]);
+  const row = value;
+  const text = (key: string): string => asString(row[key]) ?? "";
+  const event = asString(row["hook_event_name"]);
+  const cwd = asString(row["cwd"]);
   if (event === null || cwd === null) return null;
   return {
     event,
     cwd,
-    trigger: asString(value["reason"]) ?? asString(value["source"]) ?? "",
-    sessionId: asString(value["session_id"]) ?? "",
-    transcriptPath: asString(value["transcript_path"]) ?? "",
+    trigger: asString(row["reason"]) ?? text("source"),
+    sessionId: text("session_id"),
+    transcriptPath: text("transcript_path"),
+    toolName: text("tool_name"),
+    agentId: text("agent_id"),
   };
 }
 
@@ -110,16 +120,34 @@ function afterReply(input: HookInput, now: Date, dir: string): string {
   return message === "" ? "" : JSON.stringify({ systemMessage: message });
 }
 
+/**
+ * 道具を使い終わったとき。下請けに出さずに続けていたら、**AIの文脈に**一行足す
+ * （delegate-nudge.ts）。人に見せる知らせではないので systemMessage には出さない。
+ */
+function afterTool(input: HookInput, now: Date, dir: string): string {
+  const message = delegateNudge(
+    { sessionId: input.sessionId, transcriptPath: input.transcriptPath, toolName: input.toolName, agentId: input.agentId },
+    dir,
+    undefined,
+    now,
+  );
+  return message === ""
+    ? ""
+    : JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: message } });
+}
+
 /** フックの入力を受けて、標準出力に出す文字列を返す（出すものが無ければ空） */
 export function runHook(raw: string, now: Date = new Date(), dir?: string): string {
   const input = parseHookInput(raw);
   if (input === null) return "";
   const stateDir = dir ?? dirname(defaultHandoffPath());
+  if (input.event === "PostToolUse") return afterTool(input, now, stateDir);
   if (input.event === "Stop") return afterReply(input, now, stateDir);
   if (input.trigger !== "clear") return "";
   if (input.event === "SessionEnd") {
     remember(input, now, dir);
     forgetNudge(stateDir, input.sessionId);
+    forgetDelegate(stateDir, input.sessionId);
   }
   if (input.event !== "SessionStart") return "";
   const context = recall(input, now, dir);
