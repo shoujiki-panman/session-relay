@@ -97,6 +97,7 @@ npm install -g @shoujiki-panman/session-relay   # relay コマンドが入る
 ```
 relay                    別のスレッドで続きから開く
 relay --to codex         Codexで開く
+relay --model <名前>     渡す先のモデルを指定する（重いモデルで決めて、軽いモデルで回す）
 relay --print            文脈だけ出す（貼りたいとき）
 relay --print --previous 自分ではなく「直前の会話」を引く
 relay mark               いまの会話に「次はこれ」の印をつける（起動しない）
@@ -115,6 +116,7 @@ relay --canvas           プロジェクトと会話を .canvas に書き出す
 
 relay install            MCPと「続きから」スキルをまとめて登録する
 relay mcp                MCPサーバーとして話す（AIが自分で取りに来る）
+relay hook               Claude Codeのフック用（/clear で引き継ぐ・区切りどきを知らせる）
 relay --help             使い方を出す
 ```
 
@@ -185,6 +187,50 @@ Raycastに登録するなら `examples/raycast/` を Script Directory に追加�
 
 **押しても画面は変わらない。** 効いたかどうかは `relay mark --show` で見る
 （印があれば見出しと時刻を出し、無ければ 1 を返す）。
+
+### 同じ画面のまま会話を軽くする（`relay hook`）
+
+長く続けた会話は、1回の返事のたびに全部を読み直す。`/clear` で区切れば減るが、
+「新しいセッションを開いて『続きから』と打つ」のは面倒で続かない。
+だから**打つのは `/clear` だけ**にした。画面もターミナルも同じまま、文脈だけが入れ替わる。
+
+`~/.claude/settings.json` に入れる。入り口は `relay hook` 1つで、どのフックから呼ばれたかは中で見分ける。
+
+```json
+{ "hooks": {
+  "SessionEnd":   [{ "matcher": "clear", "hooks": [{ "type": "command", "command": "relay hook" }] }],
+  "SessionStart": [{ "matcher": "clear", "hooks": [{ "type": "command", "command": "relay hook" }] }],
+  "Stop":         [{ "hooks": [{ "type": "command", "command": "relay hook" }] }],
+  "PostToolUse":  [{ "hooks": [{ "type": "command", "command": "relay hook" }] }]
+} }
+```
+
+| フック | やること |
+|---|---|
+| `SessionEnd`（`clear`） | 終わる会話の記録の場所を控える |
+| `SessionStart`（`clear`） | 控えた会話の文脈を標準出力に出す（＝新しい会話に入る） |
+| `Stop` | 会話が育っていたら「いま区切るといい」を**本人の画面に**一行出す |
+| `PostToolUse` | 下請けに出さず道具を続けていたら、**AIの文脈に**一行足す |
+
+`/clear` の前後でセッションIDは変わるので、控えるのは**記録のパス**。控えは場所（cwd）ごとに分け、
+10分で失効し、一度出したら消える。**フックは何があっても失敗させない**——壊れた入力・控えなし・
+期限切れ・読めないときは、黙って何も出さない。
+
+**区切りどきの知らせ（`Stop`）。** 返事が終わった瞬間に「いちばん新しい返事が読んだ量」を見て、
+閾値を超えていたら出す。出すだけで、自動では区切らない（調べものの最中に切られると読み直しで損をする）。
+
+```
+relay: この会話は32万トークンまで育ちました。切りのいいところで /clear すると軽くなります（話は続きます）
+```
+
+閾値は `RELAY_NUDGE_TOKENS`（既定30万）、しつこくしない刻みは `RELAY_NUDGE_STEP`。
+**既定値は試算に使った値で、使いながら見直す前提**。
+
+**下請けに出していないことの知らせ（`PostToolUse`）。** `Agent` / `Task` を呼ばずに道具を
+続けて使った回数を数え、既定8回で一行入れる（`RELAY_DELEGATE_CALLS` で変更）。
+メインのモデル名に `fable` を含むときだけ出し、読めなければ黙る。
+
+⚠️ デスクトップアプリは `/clear` を自前で処理するので、このフックは動かない（実測）。
 
 ### 同じハーネスの続きなら、標準のほうが素直
 
