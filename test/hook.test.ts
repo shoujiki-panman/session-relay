@@ -107,3 +107,38 @@ describe("壊れた入力でも落ちない", () => {
     expect(runHook(input("SessionStart", { source: "clear" }, "/w"), after(1000), dir)).toBe("");
   });
 });
+
+describe("/clear を重ねても最初の会話が落ちない", () => {
+  it("フックが入れた文脈（添付として記録される）を、次の引き継ぎで発話に開く", async () => {
+    const { buildContext } = await import("../src/context.ts");
+    const dir = temp();
+    const first = session(dir, "/w", ["合言葉はたぬき。覚えておいて"]);
+    runHook(input("SessionEnd", { reason: "clear" }, "/w", first), T0, dir);
+    const injected = runHook(input("SessionStart", { source: "clear" }, "/w"), after(1000), dir);
+    // 2つ目の会話の記録: フックの出力は attachment、本人の発話は user 行（実測の形）
+    const second = join(dir, "second.jsonl");
+    const rows = [
+      { type: "attachment", sessionId: "new", cwd: "/w", timestamp: "2026-09-18T12:00:01Z", attachment: { type: "hook_success", hookEvent: "SessionStart", stdout: injected } },
+      { type: "user", sessionId: "new", cwd: "/w", promptSource: "typed", message: { role: "user", content: "合言葉は？" } },
+    ];
+    writeFileSync(second, `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`);
+    const out = buildContext(second) ?? "";
+    expect(out).toContain("合言葉はたぬき。覚えておいて");
+    expect(out).toContain("合言葉は？");
+    expect(out.indexOf("覚えておいて")).toBeLessThan(out.indexOf("合言葉は？"));
+    // 見出しが二重にならない＝入れ子のまま持ち越していない
+    expect(out.split("# 前の会話の記録").length - 1).toBe(1);
+  });
+
+  it("relayの文脈でないフック出力は、本人の発話にしない", async () => {
+    const { buildContext } = await import("../src/context.ts");
+    const dir = temp();
+    const path = join(dir, "other.jsonl");
+    const rows = [
+      { type: "attachment", sessionId: "s", cwd: "/w", attachment: { type: "hook_success", stdout: "caffeinate started" } },
+      { type: "user", sessionId: "s", cwd: "/w", promptSource: "typed", message: { role: "user", content: "本人の言葉" } },
+    ];
+    writeFileSync(path, `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`);
+    expect(buildContext(path) ?? "").not.toContain("caffeinate started");
+  });
+});
