@@ -102,6 +102,28 @@ describe("記録の末尾を、話者つきの素のテキストにする", () =
     });
     expect(recentTurnsText(row)).toBe("AI：本文");
   });
+
+  it("発話の中の改行は空白に畳む（1行＝1発話を崩さない）", () => {
+    const text = recentTurnsText(said("assistant", "直しました。\n\n- 1件目\n- 2件目\n"));
+    expect(text).toBe("AI：直しました。 - 1件目 - 2件目");
+  });
+
+  it("改行を含む発話が混ざっても、行数は発話の数と同じ", () => {
+    const rows = [
+      said("user", "これ直して\nあと、ついでに"),
+      said("assistant", "やりました\n\n手順:\n1. A\n2. B"),
+      said("user", "ありがとう"),
+    ];
+    expect(recentTurnsText(rows.join("\n")).split("\n")).toHaveLength(3);
+  });
+
+  it("ブロックが複数あっても1行になる", () => {
+    const row = JSON.stringify({
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "text", text: "前半" }, { type: "text", text: "後半" }] },
+    });
+    expect(recentTurnsText(row)).toBe("AI：前半 後半");
+  });
 });
 
 describe("区切りかどうかを聞く", () => {

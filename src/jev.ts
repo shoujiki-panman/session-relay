@@ -61,6 +61,14 @@ export const jevOptions = (env: Readonly<Record<string, string | undefined>> = p
 const clip = (text: string): string =>
   text.length <= MAX_CHARS_PER_TURN ? text : `${text.slice(0, MAX_CHARS_PER_TURN)}…`;
 
+/**
+ * 発話の中の改行を空白に畳む。
+ * Jev には「1行＝1発話」として読ませているので、
+ * 箇条書きやコード片で改行の入った発話が1つあるだけで、行数と発話数がずれる
+ * （実測 2026-09-20: 6往復のつもりが11行になっていた）。
+ */
+const flatten = (text: string): string => text.replace(/\s*[\r\n]+\s*/g, " ").trim();
+
 /** 1行の message から本文を取る。文字列でもブロックの配列でも拾う */
 function textOf(message: unknown): string {
   if (!isRecord(message)) return "";
@@ -85,7 +93,7 @@ function turnOf(row: Row): string | null {
   if (text === "") return null;
   // 注入された発話（system-reminder など）は本人の言葉ではない
   if (type === "user" && classifyUtterance(text) !== "human") return null;
-  return `${type === "user" ? "本人" : "AI"}：${clip(text)}`;
+  return `${type === "user" ? "本人" : "AI"}：${clip(flatten(text))}`;
 }
 
 /** 記録の末尾から、直近の往復を話者つきの素のテキストにする */
