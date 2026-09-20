@@ -264,7 +264,7 @@ if (command === "install") {
 } else if (command === "hook") {
   // フックは何があっても失敗させない（/clear のたびに赤い字を出さない）
   try {
-    process.stdout.write(runHook(readFileSync(0, "utf8")));
+    process.stdout.write(await runHook(readFileSync(0, "utf8")));
   } catch {
     // 黙る
   }
