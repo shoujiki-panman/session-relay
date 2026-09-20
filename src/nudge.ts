@@ -6,6 +6,7 @@
  * AIの返事が終わった瞬間（Stopフック）に会話の重さを見て、育っていたら画面に一行出す。
  *
  * - 出すだけ。自動では区切らない（調査の最中に切られると読み直しで損をする）
+ * - 中身を見る門（gate）を渡せる。「途中」と言われたら段を進めず、次の返事でまた見る
  * - しつこくしない。閾値を超えたとき1回、あとは一定量育つごとに1回
  * - 閾値は使いながら決める（本人）。環境変数で変えられる
  */
@@ -111,20 +112,32 @@ export function forgetNudge(dir: string, sessionId: string): void {
   rmSync(stateFile(dir, sessionId), { force: true });
 }
 
+/**
+ * 会話の中身を見る門。true=区切り / false=途中 / null=判定なし。
+ * 既定は null、つまりトークン数だけで決める今までの動き。実物は jev.ts。
+ */
+export type StoppingGate = (tail: string) => Promise<boolean | null>;
+
+const noGate: StoppingGate = () => Promise.resolve(null);
+
 /** 返事が終わったときに呼ぶ。画面に出す一行を返す（出さないなら空） */
-export function nudge(
+export async function nudge(
   transcriptPath: string,
   sessionId: string,
   dir: string,
   options: NudgeOptions = nudgeOptions(),
   now: Date = new Date(),
-): string {
+  gate: StoppingGate = noGate,
+): Promise<string> {
   if (transcriptPath === "" || sessionId === "") return "";
-  const tokens = lastContextTokens(readTail(transcriptPath));
+  const tail = readTail(transcriptPath);
+  const tokens = lastContextTokens(tail);
   if (tokens === null) return "";
   const level = nudgeLevel(tokens, options.threshold, options.step);
   const file = stateFile(dir, sessionId);
   if (level <= readLevel(file)) return "";
+  // 中身が「途中」なら段を進めない。次の返事でまた見る（良い切れ目を待つ）
+  if ((await gate(tail)) === false) return "";
   mkdirSync(dir, { recursive: true });
   writeFileSync(file, String(level));
   prune(dir, now);

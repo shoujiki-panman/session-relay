@@ -207,11 +207,11 @@ describe("フックとして（PostToolUse）", () => {
   const post = (path: string, toolName = "Read", extra: Record<string, string> = {}): string =>
     JSON.stringify({ hook_event_name: "PostToolUse", cwd: "/w", session_id: "s", transcript_path: path, tool_name: toolName, ...extra });
 
-  it("続けたらAIの文脈に足す（人に見せる systemMessage は出さない）", () => {
+  it("続けたらAIの文脈に足す（人に見せる systemMessage は出さない）", async () => {
     const dir = temp();
     const path = fable(dir);
     let out = "";
-    for (let i = 0; i < DEFAULT_DELEGATE_CALLS; i++) out = runHook(post(path), NOW, dir);
+    for (let i = 0; i < DEFAULT_DELEGATE_CALLS; i++) out = await runHook(post(path), NOW, dir);
     const parsed: unknown = JSON.parse(out);
     expect(isRecord(parsed) ? Object.keys(parsed) : []).toEqual(["hookSpecificOutput"]);
     const specific: unknown = isRecord(parsed) ? parsed["hookSpecificOutput"] : null;
@@ -219,25 +219,25 @@ describe("フックとして（PostToolUse）", () => {
     expect(isRecord(specific) ? specific["additionalContext"] : null).toContain("サブエージェント");
   });
 
-  it("閾値の手前では何も出さない", () => {
+  it("閾値の手前では何も出さない", async () => {
     const dir = temp();
     const path = fable(dir);
-    for (let i = 0; i < DEFAULT_DELEGATE_CALLS - 1; i++) expect(runHook(post(path), NOW, dir)).toBe("");
+    for (let i = 0; i < DEFAULT_DELEGATE_CALLS - 1; i++) expect(await runHook(post(path), NOW, dir)).toBe("");
   });
 
-  it("サブエージェントの中からの道具使用（agent_id つき）は数えない", () => {
+  it("サブエージェントの中からの道具使用（agent_id つき）は数えない", async () => {
     const dir = temp();
     const path = fable(dir);
     for (let i = 0; i < DEFAULT_DELEGATE_CALLS * 2; i++) {
-      expect(runHook(post(path, "Read", { agent_id: "sub-1" }), NOW, dir)).toBe("");
+      expect(await runHook(post(path, "Read", { agent_id: "sub-1" }), NOW, dir)).toBe("");
     }
   });
 
-  it("/clear したら数えも消える", () => {
+  it("/clear したら数えも消える", async () => {
     const dir = temp();
     const path = fable(dir);
-    runHook(post(path), NOW, dir);
-    runHook(JSON.stringify({ hook_event_name: "SessionEnd", reason: "clear", cwd: "/w", session_id: "s", transcript_path: path }), NOW, dir);
+    await runHook(post(path), NOW, dir);
+    await runHook(JSON.stringify({ hook_event_name: "SessionEnd", reason: "clear", cwd: "/w", session_id: "s", transcript_path: path }), NOW, dir);
     expect(readdirSync(dir).filter((name) => name.startsWith("delegate-"))).toEqual([]);
   });
 });

@@ -33,48 +33,48 @@ const T0 = new Date("2026-09-18T12:00:00Z");
 const after = (ms: number): Date => new Date(T0.getTime() + ms);
 
 describe("/clear の前後をつなぐ", () => {
-  it("終わる会話を控え、次の会話の頭に本人の発話を原文で出す", () => {
+  it("終わる会話を控え、次の会話の頭に本人の発話を原文で出す", async () => {
     const dir = temp();
     const old = session(dir, "/w", ["地図の色を羊皮紙にしたい", "ボタンは臙脂で"]);
-    expect(runHook(input("SessionEnd", { reason: "clear" }, "/w", old), T0, dir)).toBe("");
-    const out = unwrapHookStdout(runHook(input("SessionStart", { source: "clear" }, "/w"), after(2000), dir));
+    expect(await runHook(input("SessionEnd", { reason: "clear" }, "/w", old), T0, dir)).toBe("");
+    const out = unwrapHookStdout(await runHook(input("SessionStart", { source: "clear" }, "/w"), after(2000), dir));
     expect(isRelayContext(out)).toBe(true);
     expect(out).toContain("地図の色を羊皮紙にしたい");
     expect(out).toContain("ボタンは臙脂で");
     expect(out).toContain(CLEAR_NOTE);
   });
 
-  it("一度出したら控えは消える（次の無関係な /clear に流れ込まない）", () => {
+  it("一度出したら控えは消える（次の無関係な /clear に流れ込まない）", async () => {
     const dir = temp();
     const old = session(dir, "/w", ["一度だけ出てほしい話"]);
-    runHook(input("SessionEnd", { reason: "clear" }, "/w", old), T0, dir);
-    expect(runHook(input("SessionStart", { source: "clear" }, "/w"), after(1000), dir)).not.toBe("");
-    expect(runHook(input("SessionStart", { source: "clear" }, "/w"), after(2000), dir)).toBe("");
+    await runHook(input("SessionEnd", { reason: "clear" }, "/w", old), T0, dir);
+    expect(await runHook(input("SessionStart", { source: "clear" }, "/w"), after(1000), dir)).not.toBe("");
+    expect(await runHook(input("SessionStart", { source: "clear" }, "/w"), after(2000), dir)).toBe("");
     expect(existsSync(slotFor("/w", dir))).toBe(false);
   });
 
-  it("別の場所の /clear には出さない", () => {
+  it("別の場所の /clear には出さない", async () => {
     const dir = temp();
     const old = session(dir, "/a", ["プロジェクトAの話"]);
-    runHook(input("SessionEnd", { reason: "clear" }, "/a", old), T0, dir);
-    expect(runHook(input("SessionStart", { source: "clear" }, "/b"), after(1000), dir)).toBe("");
+    await runHook(input("SessionEnd", { reason: "clear" }, "/a", old), T0, dir);
+    expect(await runHook(input("SessionStart", { source: "clear" }, "/b"), after(1000), dir)).toBe("");
   });
 
-  it("期限を過ぎた控えは出さず、消す", () => {
+  it("期限を過ぎた控えは出さず、消す", async () => {
     const dir = temp();
     const old = session(dir, "/w", ["昼の話"]);
-    runHook(input("SessionEnd", { reason: "clear" }, "/w", old), T0, dir);
-    expect(runHook(input("SessionStart", { source: "clear" }, "/w"), after(SLOT_TTL_MS + 1), dir)).toBe("");
+    await runHook(input("SessionEnd", { reason: "clear" }, "/w", old), T0, dir);
+    expect(await runHook(input("SessionStart", { source: "clear" }, "/w"), after(SLOT_TTL_MS + 1), dir)).toBe("");
     expect(existsSync(slotFor("/w", dir))).toBe(false);
   });
 });
 
 describe("引き継いだことを本人の画面にも出す", () => {
-  it("文脈はAIに、一行は本人に（フックのJSON形式）", () => {
+  it("文脈はAIに、一行は本人に（フックのJSON形式）", async () => {
     const dir = temp();
     const old = session(dir, "/w", ["地図の色を羊皮紙にしたい", "ボタンは臙脂で"]);
-    runHook(input("SessionEnd", { reason: "clear" }, "/w", old), T0, dir);
-    const out = runHook(input("SessionStart", { source: "clear" }, "/w"), after(1000), dir);
+    await runHook(input("SessionEnd", { reason: "clear" }, "/w", old), T0, dir);
+    const out = await runHook(input("SessionStart", { source: "clear" }, "/w"), after(1000), dir);
     const parsed: unknown = JSON.parse(out);
     const message = isRecord(parsed) ? parsed["systemMessage"] : null;
     expect(message).toContain("本人の発話 2件");
@@ -93,42 +93,42 @@ describe("引き継いだことを本人の画面にも出す", () => {
 });
 
 describe("関係ない合図では何もしない", () => {
-  it("/clear 以外の終わり方は控えない（ログアウトや終了で次の会話を汚さない）", () => {
+  it("/clear 以外の終わり方は控えない（ログアウトや終了で次の会話を汚さない）", async () => {
     const dir = temp();
     const old = session(dir, "/w", ["終了しただけ"]);
-    runHook(input("SessionEnd", { reason: "logout" }, "/w", old), T0, dir);
+    await runHook(input("SessionEnd", { reason: "logout" }, "/w", old), T0, dir);
     expect(existsSync(slotFor("/w", dir))).toBe(false);
   });
 
-  it("普通の起動・再開・圧縮では出さない", () => {
+  it("普通の起動・再開・圧縮では出さない", async () => {
     const dir = temp();
     const old = session(dir, "/w", ["話"]);
-    runHook(input("SessionEnd", { reason: "clear" }, "/w", old), T0, dir);
+    await runHook(input("SessionEnd", { reason: "clear" }, "/w", old), T0, dir);
     for (const source of ["startup", "resume", "compact"]) {
-      expect(runHook(input("SessionStart", { source }, "/w"), after(1000), dir)).toBe("");
+      expect(await runHook(input("SessionStart", { source }, "/w"), after(1000), dir)).toBe("");
     }
   });
 });
 
 describe("壊れた入力でも落ちない", () => {
-  it("JSONでない・空・項目が欠けている入力は、黙って何も出さない", () => {
+  it("JSONでない・空・項目が欠けている入力は、黙って何も出さない", async () => {
     const dir = temp();
     for (const raw of ["", "not json", "[]", "{}", JSON.stringify({ hook_event_name: "SessionStart" })]) {
       expect(parseHookInput(raw)).toBeNull();
-      expect(runHook(raw, T0, dir)).toBe("");
+      expect(await runHook(raw, T0, dir)).toBe("");
     }
   });
 
-  it("記録の場所が空なら控えない", () => {
+  it("記録の場所が空なら控えない", async () => {
     const dir = temp();
-    runHook(input("SessionEnd", { reason: "clear" }, "/w", ""), T0, dir);
+    await runHook(input("SessionEnd", { reason: "clear" }, "/w", ""), T0, dir);
     expect(existsSync(slotFor("/w", dir))).toBe(false);
   });
 
-  it("控えた記録が消えていたら出さない", () => {
+  it("控えた記録が消えていたら出さない", async () => {
     const dir = temp();
-    runHook(input("SessionEnd", { reason: "clear" }, "/w", join(dir, "gone.jsonl")), T0, dir);
-    expect(runHook(input("SessionStart", { source: "clear" }, "/w"), after(1000), dir)).toBe("");
+    await runHook(input("SessionEnd", { reason: "clear" }, "/w", join(dir, "gone.jsonl")), T0, dir);
+    expect(await runHook(input("SessionStart", { source: "clear" }, "/w"), after(1000), dir)).toBe("");
   });
 });
 
@@ -137,8 +137,8 @@ describe("/clear を重ねても最初の会話が落ちない", () => {
     const { buildContext } = await import("../src/context.ts");
     const dir = temp();
     const first = session(dir, "/w", ["合言葉はたぬき。覚えておいて"]);
-    runHook(input("SessionEnd", { reason: "clear" }, "/w", first), T0, dir);
-    const injected = runHook(input("SessionStart", { source: "clear" }, "/w"), after(1000), dir);
+    await runHook(input("SessionEnd", { reason: "clear" }, "/w", first), T0, dir);
+    const injected = await runHook(input("SessionStart", { source: "clear" }, "/w"), after(1000), dir);
     // 2つ目の会話の記録: フックの出力は attachment、本人の発話は user 行（実測の形）
     const second = join(dir, "second.jsonl");
     const rows = [

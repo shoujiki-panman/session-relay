@@ -64,28 +64,28 @@ describe("しつこくしない", () => {
     expect(nudgeLevel(400_000, 300_000, 100_000)).toBe(2);
   });
 
-  it("閾値を超えたとき1回だけ出し、同じ段では黙り、次の段でまた出す", () => {
+  it("閾値を超えたとき1回だけ出し、同じ段では黙り、次の段でまた出す", async () => {
     const dir = temp();
-    expect(nudge(transcript(dir, [reply(200_000)]), "s", dir, OPTIONS, NOW)).toBe("");
-    expect(nudge(transcript(dir, [reply(320_000)]), "s", dir, OPTIONS, NOW)).toContain("32万トークン");
-    expect(nudge(transcript(dir, [reply(350_000)]), "s", dir, OPTIONS, NOW)).toBe("");
-    expect(nudge(transcript(dir, [reply(410_000)]), "s", dir, OPTIONS, NOW)).toContain("41万トークン");
+    expect(await nudge(transcript(dir, [reply(200_000)]), "s", dir, OPTIONS, NOW)).toBe("");
+    expect(await nudge(transcript(dir, [reply(320_000)]), "s", dir, OPTIONS, NOW)).toContain("32万トークン");
+    expect(await nudge(transcript(dir, [reply(350_000)]), "s", dir, OPTIONS, NOW)).toBe("");
+    expect(await nudge(transcript(dir, [reply(410_000)]), "s", dir, OPTIONS, NOW)).toContain("41万トークン");
   });
 
-  it("別の会話の控えとは混ざらない", () => {
+  it("別の会話の控えとは混ざらない", async () => {
     const dir = temp();
     const path = transcript(dir, [reply(320_000)]);
-    expect(nudge(path, "a", dir, OPTIONS, NOW)).not.toBe("");
-    expect(nudge(path, "b", dir, OPTIONS, NOW)).not.toBe("");
+    expect(await nudge(path, "a", dir, OPTIONS, NOW)).not.toBe("");
+    expect(await nudge(path, "b", dir, OPTIONS, NOW)).not.toBe("");
   });
 
-  it("古い控えは片づける", () => {
+  it("古い控えは片づける", async () => {
     const dir = temp();
     const stale = join(dir, "nudge-old");
     writeFileSync(stale, "1");
     const old = new Date(NOW.getTime() - 8 * 24 * 60 * 60 * 1000);
     utimesSync(stale, old, old);
-    nudge(transcript(dir, [reply(320_000)]), "s", dir, OPTIONS, NOW);
+    await nudge(transcript(dir, [reply(320_000)]), "s", dir, OPTIONS, NOW);
     expect(existsSync(stale)).toBe(false);
   });
 });
@@ -102,25 +102,25 @@ describe("フックとして（Stop）", () => {
   const stop = (path: string, id = "s"): string =>
     JSON.stringify({ hook_event_name: "Stop", cwd: "/w", session_id: id, transcript_path: path });
 
-  it("育った会話では、本人の画面に出す一行だけを返す（AIの文脈には足さない）", () => {
+  it("育った会話では、本人の画面に出す一行だけを返す（AIの文脈には足さない）", async () => {
     const dir = temp();
-    const out = runHook(stop(transcript(dir, [reply(320_000)])), NOW, dir);
+    const out = await runHook(stop(transcript(dir, [reply(320_000)])), NOW, dir);
     const parsed: unknown = JSON.parse(out);
     expect(isRecord(parsed) ? Object.keys(parsed) : []).toEqual(["systemMessage"]);
     expect(out).toContain("/clear");
   });
 
-  it("軽い会話・記録が無い・読めないときは黙る（フックを落とさない）", () => {
+  it("軽い会話・記録が無い・読めないときは黙る（フックを落とさない）", async () => {
     const dir = temp();
-    expect(runHook(stop(transcript(dir, [reply(1000)])), NOW, dir)).toBe("");
-    expect(runHook(stop(""), NOW, dir)).toBe("");
+    expect(await runHook(stop(transcript(dir, [reply(1000)])), NOW, dir)).toBe("");
+    expect(await runHook(stop(""), NOW, dir)).toBe("");
   });
 
-  it("/clear したら控えを消す（同じIDで出直しても、また知らせる）", () => {
+  it("/clear したら控えを消す（同じIDで出直しても、また知らせる）", async () => {
     const dir = temp();
     const path = transcript(dir, [reply(320_000)]);
-    runHook(stop(path), NOW, dir);
-    runHook(JSON.stringify({ hook_event_name: "SessionEnd", reason: "clear", cwd: "/w", session_id: "s", transcript_path: path }), NOW, dir);
+    await runHook(stop(path), NOW, dir);
+    await runHook(JSON.stringify({ hook_event_name: "SessionEnd", reason: "clear", cwd: "/w", session_id: "s", transcript_path: path }), NOW, dir);
     expect(readdirSync(dir).filter((name) => name.startsWith("nudge-"))).toEqual([]);
   });
 });

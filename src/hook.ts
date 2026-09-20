@@ -19,6 +19,7 @@ import { dirname, join } from "node:path";
 import { buildContext } from "./context.ts";
 import { delegateNudge, forgetDelegate } from "./delegate-nudge.ts";
 import { clearHandoff, defaultHandoffPath, peekHandoff, putHandoff } from "./handoff.ts";
+import { jevGate } from "./jev.ts";
 import { forgetNudge, nudge } from "./nudge.ts";
 import { parseRelayContext } from "./relay-block.ts";
 import { readRepoSignals } from "./repo.ts";
@@ -114,9 +115,12 @@ export const wrapForClaude = (context: string): string =>
     hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: context },
   });
 
-/** 返事が終わったとき。会話が育っていたら「いま区切るといい」を本人の画面に出す（nudge.ts） */
-function afterReply(input: HookInput, now: Date, dir: string): string {
-  const message = nudge(input.transcriptPath, input.sessionId, dir, undefined, now);
+/**
+ * 返事が終わったとき。会話が育っていたら「いま区切るといい」を本人の画面に出す（nudge.ts）。
+ * 鍵（TYPESAFE_API_KEY）があるときだけ、会話の中身も見て切れ目を選ぶ（jev.ts）。
+ */
+async function afterReply(input: HookInput, now: Date, dir: string): Promise<string> {
+  const message = await nudge(input.transcriptPath, input.sessionId, dir, undefined, now, jevGate());
   return message === "" ? "" : JSON.stringify({ systemMessage: message });
 }
 
@@ -137,7 +141,7 @@ function afterTool(input: HookInput, now: Date, dir: string): string {
 }
 
 /** フックの入力を受けて、標準出力に出す文字列を返す（出すものが無ければ空） */
-export function runHook(raw: string, now: Date = new Date(), dir?: string): string {
+export async function runHook(raw: string, now: Date = new Date(), dir?: string): Promise<string> {
   const input = parseHookInput(raw);
   if (input === null) return "";
   const stateDir = dir ?? dirname(defaultHandoffPath());
