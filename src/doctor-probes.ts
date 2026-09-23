@@ -140,8 +140,12 @@ export interface Reach {
 }
 
 /**
- * 外から届いたかの判定。Cloudflare Access が 302/401/403 を返すのは「トンネルの先まで来た」証拠。
+ * 外から届いたかの判定。Cloudflare Access の 302/401/403 は「届いている」、
  * 530（本文に 1033 が載る）は「Cloudflareまでは来たがトンネルが繋がっていない」。
+ *
+ * ⚠️ 実測（2026-09-24）: Access（Managed OAuth）を前に置いた構成では、cloudflared を止めても
+ * 未認証の要求には Cloudflare の縁が 401 を返し続けた。つまりこの判定は「DNS・Cloudflare・Access まで
+ * 届く」ことしか言えず、トンネルの生死は tunnel-agent（launchctl）の側で見る。
  */
 export function classifyReach(status: number, body: string): Reach {
   if (status === 530 || (status >= 500 && body.includes("1033")))

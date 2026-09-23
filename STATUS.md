@@ -28,6 +28,13 @@
 - 外に触る部分（launchctl・fetch・sleep）は `Probes` で差し込める。テスト10件追加（2026-09-22 の再現、--fix、bootstrap、戻らないとき、資格情報が載らない）。381件緑
 - 新しいファイル: `src/doctor-probes.ts`（外に触る部分）、`src/doctor-cli.ts`（表示と修理）
 
+**実地確認（2026-09-24 02:19〜02:29 JST、本人承認済み）**
+- `launchctl kill SIGTERM gui/$(id -u)/com.cloudflare.cloudflared` → `state = not running`, `last exit code = 0`。**KeepAlive=true なのに launchd は起こさなかった**（9/22 と同じ）
+- `relay doctor` → `⚠️ トンネルの常駐（cloudflared）: 止まっている`、exit 1
+- `relay doctor --fix --json` → `fixes: [{ label: com.cloudflare.cloudflared, reasons: [tunnel-agent], action: kickstart, ok: true }]`、ok: true、exit 0。ログに `Registered tunnel connection` connIndex=0〜3
+- ⚠️ **外からの到達の検査は、トンネルが止まっていても 401 だった**。Access（Managed OAuth）が Cloudflare の縁で未認証要求に 401 を返すため、トンネルの生死は分からない。止まったことを捕まえたのは launchctl の検査
+  - 次の候補: cloudflared のメトリクス `127.0.0.1:<port>/ready`（`readyConnections` が載る。ポートはログの `Starting metrics server on`）を見る。未着手
+
 
 ### 区切りの知らせを、会話の中身で選ぶ（2026-09-20・PR #13）
 
