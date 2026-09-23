@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- `relay doctor` がトンネルも見るようにした。受け口が生きていてもトンネルが止まっていれば ✗ を出す（2026-09-22、止まっている間も「ぜんぶ通っています」と言っていた）
+  - cloudflared の LaunchAgent が動いているか（`launchctl print`）と、`~/.cloudflared/config.yml` で受け口の port に向く公開ホスト名に HTTPS で届くか
+  - Cloudflare Access の 302/401/403 は「届いている」、530（1033）・接続エラー・時間切れは「届いていない」
+  - cloudflared の設定が無い人には「未設定」と出し、失敗にしない
+- `relay doctor --fix`: 落ちている受け口・トンネルを `launchctl kickstart -k` で起こし、戻るまで（最大30秒）確かめ直す
+- `relay doctor --json`: 機械が読む形（各項目の id / ok / state / detail と、起こしたなら何をいつ起こしたか）
+
 ## 0.3.0 - 2026-09-19
 
 - `relay --model <名前>`: 渡す先のモデルを指定できる（重いモデルで決めて、軽いモデルで回す）。claude も codex もそのまま受け取る

@@ -1,4 +1,4 @@
-# 進捗ボード — session-relay（2026-09-20更新）
+# 進捗ボード — session-relay（2026-09-24更新）
 
 ## 📍 いまここ（2026-09-19）
 - **PR #8〜#11 は全部 main にマージ済み**（2026-09-19。#8 → #9 → #10 → #11 の順）
@@ -12,6 +12,22 @@
   - **9/25頃に入力トークンの前後比較**（`/clear` フックを入れる前と後）
 
 ## ✅ 完了したこと
+
+### relay doctor がトンネルを見る・--fix で起こす・--json で渡す（2026-09-24・main直コミット）
+
+2026-09-22T19:19Z、Cloudflare Tunnel が「no more connections active and exiting」で exit 0 して止まり、
+`KeepAlive=true` なのに launchd が起こさなかった（`pended nondemand spawn = inefficient`）。受け口は生きていたので、
+受け口だけを見ていた doctor は止まっている間ずっと「ぜんぶ通っています」と言っていた。
+
+- 足した検査: トンネルの常駐（`launchctl print` の state）と、外からの到達（config.yml で 8788 に向く ingress の hostname へ HTTPS）
+  - ホスト名もラベルも決め打ちしない（ラベルは `~/Library/LaunchAgents` の plist を中身で探す）
+  - Access の 302/401/403＝届いている、530・1033・接続エラー・時間切れ（8秒、AbortController）＝届いていない
+  - cloudflared の設定が無い人は「➖ 未設定」で失敗にしない
+- `--fix`: 落ちた常駐を `launchctl kickstart -k gui/<uid>/<label>` で起こす（読み込まれていなければ先に bootstrap）。3秒おき最大30秒確かめ直す
+- `--json`: `{ ok, checkedAt, checks[{id,name,ok,state,detail,hint}], fixes[{label,reasons,action,ok,at}] }`。Mulmo Control の環境タブが読む
+- 外に触る部分（launchctl・fetch・sleep）は `Probes` で差し込める。テスト10件追加（2026-09-22 の再現、--fix、bootstrap、戻らないとき、資格情報が載らない）。381件緑
+- 新しいファイル: `src/doctor-probes.ts`（外に触る部分）、`src/doctor-cli.ts`（表示と修理）
+
 
 ### 区切りの知らせを、会話の中身で選ぶ（2026-09-20・PR #13）
 

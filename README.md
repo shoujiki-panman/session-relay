@@ -31,7 +31,7 @@ Node.js 20以降が必要です。現在の実機確認はmacOSで行ってい�
 ```sh
 npm install -g @shoujiki-panman/session-relay
 relay install
-relay doctor     # 登録と生存の検査。繋がらない時もまずこれ
+relay doctor     # 登録と生存（受け口・トンネル）の検査。繋がらない時もまずこれ。--fix で落ちた常駐を起こす
 ```
 
 git cloneで開発版を使う場合は、`bin/relay.js` が `src/` の `.ts` を直接読むため
