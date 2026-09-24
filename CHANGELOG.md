@@ -7,6 +7,7 @@
   - Cloudflare Access の 302/401/403 は「届いている」、530（1033）・接続エラー・時間切れは「届いていない」
   - ⚠️ Access を前に置いた構成では、トンネルが止まっていても縁が 401 を返す。外からの到達はトンネルの生死を示さないので、止まったことは LaunchAgent の検査で捕まえる（2026-09-24 に実測）
   - cloudflared の設定が無い人には「未設定」と出し、失敗にしない
+- `relay doctor` がトンネルの接続の本数も見る（cloudflared の `/ready` の `readyConnections`、id `tunnel-ready`）。プロセスは生きているのに接続だけ落ちた（0本）を捕まえ、`--fix` の対象にする。メトリクスの場所は LaunchAgent のログから読み、`connectorId` が一致したときだけ信じる（別の cloudflared を拾わない）。決められなければ「未確認」で失敗にしない。`--fix` の確かめ直しも接続が張れるまで待つ
 - `relay doctor --fix`: 落ちている受け口・トンネルを `launchctl kickstart -k` で起こし、戻るまで（最大30秒）確かめ直す
 - `relay doctor --json`: 機械が読む形（各項目の id / ok / state / detail と、起こしたなら何をいつ起こしたか）
 - 区切りの知らせを、会話の中身で選ぶ（任意）。`TYPESAFE_API_KEY` があるときだけ直近6往復を Jev に渡し、話が終わる合図で終わっているときだけ出す。鍵が無い・失敗したときは今までどおり（#13 #14）

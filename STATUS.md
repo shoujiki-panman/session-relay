@@ -14,6 +14,22 @@
 
 ## ✅ 完了したこと
 
+### relay doctor がトンネルの接続の本数を見る（2026-09-24・main直コミット・0.4.0 の節）
+
+外からの到達（401）はトンネルの生死を示さず、launchctl はプロセスの生死しか言えない。だから「プロセスは生きているのに接続だけ落ちた」は捕まえられなかった。
+cloudflared のメトリクス `/ready` の `readyConnections` を見る（id `tunnel-ready`）。
+
+- **どの cloudflared か**: この Mac には別のクイックトンネルも動いていて、20241 は接続0本の別物（実測）。総当たりすると「落ちている」と誤読する。
+  LaunchAgent の StandardErrorPath のログから、最後の起動の `Starting metrics server on` と `Generated Connector ID` を読み、`/ready` の `connectorId` が一致したときだけ信じる。宛先はループバックだけ
+- 0本＝down（`--fix` で kickstart -k）、1本以上＝ok、決められない・届かない・別物＝「❔ 未確認」（失敗にしない）
+- `--fix` の確かめ直しは、起こした常駐を指す項目が全部 state=ok になるまで待つ（未確認は待つ側）。kickstart 直後に Registered 前に ok と言う穴を塞いだ
+- テスト6件追加（387件緑）。直す前の形に戻すと落ちることを3通り確かめた
+
+**実測（2026-09-24）**
+- 本物のトンネルを止めずに `relay doctor` → `✅ トンネルの接続（cloudflared）: 接続4本`
+- 接続0本の再現: relay のトンネルの接続だけを落とす手段（外向き通信の遮断）は sudo が要るので未確認。代わりに、実在する接続0本の cloudflared（無関係のクイックトンネル、20241）を指す偽の HOME で読むと `tunnel-ready down 接続0本`（読むだけ、--fix なし）
+- `launchctl bootout` → `relay doctor` は `❔ 接続（未確認）: メトリクスに届かない`＋常駐 ⚠️ → `--fix --json` は 14:26:01 に bootstrap+kickstart、14:26:04 に「接続3本」で ok（Registered は 01・02・03・04 秒）
+
 ### relay doctor がトンネルを見る・--fix で起こす・--json で渡す（2026-09-24・main直コミット）
 
 2026-09-22T19:19Z、Cloudflare Tunnel が「no more connections active and exiting」で exit 0 して止まり、

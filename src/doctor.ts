@@ -15,10 +15,14 @@ import {
   realProbes,
   tunnelHostname,
 } from "./doctor-probes.ts";
+import { metricsFromLog, probeReady, readLogTail, stderrPathOf } from "./doctor-ready.ts";
 import { isRecord } from "./types.ts";
 
-/** ok=通っている / down=落ちている / unconfigured=使っていない（失敗にしない） / missing=入っていない */
-export type CheckState = "ok" | "down" | "unconfigured" | "missing";
+/**
+ * ok=通っている / down=落ちている / unconfigured=使っていない（失敗にしない） / missing=入っていない /
+ * unknown=確かめられなかった（失敗にしない）
+ */
+export type CheckState = "ok" | "down" | "unconfigured" | "missing" | "unknown";
 
 export interface Check {
   readonly id: string;
@@ -117,7 +121,39 @@ async function tunnelAgentCheck(probes: Probes, agent: Agent | null): Promise<Ch
   return { ...base, ok, state: ok ? "ok" : "down", detail: AGENT_DETAIL[state], agent };
 }
 
-/** トンネルの2項目。設定が無い人・受け口へ向いていない人は「未設定」1件だけ（失敗にしない） */
+function readTextOrNull(path: string): string | null {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 接続が張れているか（doctor-ready.ts）。LaunchAgent のログから relay のトンネルの
+ * メトリクスを決められない人には出さない。決めたのに答えが読めないときは「未確認」。
+ */
+async function tunnelReadyCheck(probes: Probes, agent: Agent | null): Promise<Check[]> {
+  const plistText = agent === null ? null : readTextOrNull(agent.plist);
+  const logPath = plistText === null ? null : stderrPathOf(plistText);
+  const log = logPath === null ? null : readLogTail(logPath);
+  const target = log === null ? null : metricsFromLog(log);
+  if (target === null) return [];
+  const ready = await probeReady(probes, target);
+  return [
+    {
+      id: "tunnel-ready",
+      name: "トンネルの接続（cloudflared）",
+      ok: ready.state !== "down",
+      state: ready.state,
+      detail: ready.detail,
+      hint: RESIDENT_HINT,
+      agent,
+    },
+  ];
+}
+
+/** トンネルの項目。設定が無い人・受け口へ向いていない人は「未設定」1件だけ（失敗にしない） */
 async function tunnelChecks(home: string, port: number, probes: Probes): Promise<Check[]> {
   const config = readTunnelConfig(home);
   if (config === null) return [unconfigured("~/.cloudflared/config.yml が無い")];
@@ -127,6 +163,7 @@ async function tunnelChecks(home: string, port: number, probes: Probes): Promise
   const reach = await probeReach(probes, hostname);
   return [
     await tunnelAgentCheck(probes, agent),
+    ...(await tunnelReadyCheck(probes, agent)),
     {
       id: "tunnel-reach",
       name: `外からの到達（https://${hostname}）`,

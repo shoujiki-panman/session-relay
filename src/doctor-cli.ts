@@ -43,15 +43,25 @@ export function fixTargets(checks: readonly Check[]): { agent: Agent; reasons: s
   return [...byLabel.values()];
 }
 
+/**
+ * 起こした常駐を指す項目が全部 state=ok になるまで待つ。ok フラグではなく state を見るのは、
+ * 接続の検査（tunnel-ready）が起こした直後は「未確認」（ok 扱い）になるから。
+ * kickstart の直後は launchctl が running と言い、外からも 401 が返るので、それだけで
+ * 戻ったと読むと、接続が Registered になる前に「直った」と言ってしまう（2026-09-24 に気づいた）。
+ */
+function healed(checks: readonly Check[], kicked: ReadonlySet<string>): boolean {
+  return checks.every((c) => c.agent === null || !kicked.has(c.agent.label) || c.state === "ok");
+}
+
 async function recheckUntilHealed(
   home: string,
   port: number,
   probes: Probes,
-  watched: ReadonlySet<string>,
+  kicked: ReadonlySet<string>,
 ): Promise<Check[]> {
   let checks = await collectChecks(home, port, probes);
   for (let waited = 0; waited < RECHECK_LIMIT_MS; waited += RECHECK_INTERVAL_MS) {
-    if (checks.every((c) => c.ok || !watched.has(c.id))) break;
+    if (healed(checks, kicked)) break;
     await probes.sleep(RECHECK_INTERVAL_MS);
     checks = await collectChecks(home, port, probes);
   }
@@ -73,7 +83,7 @@ export async function diagnose(
     fixes.push({ label: agent.label, reasons, ...kicked, at: now().toISOString() });
   }
   if (targets.length > 0)
-    checks = await recheckUntilHealed(home, port, probes, new Set(targets.flatMap((t) => t.reasons)));
+    checks = await recheckUntilHealed(home, port, probes, new Set(targets.map((t) => t.agent.label)));
   return {
     ok: checks.every((c) => c.ok),
     checkedAt: now().toISOString(),
@@ -90,6 +100,7 @@ function publicCheck(check: Check): Omit<Check, "agent"> {
 
 function mark(check: Omit<Check, "agent">): string {
   if (check.state === "unconfigured") return "➖";
+  if (check.state === "unknown") return "❔";
   return check.ok ? "✅" : "⚠️";
 }
 
@@ -97,7 +108,7 @@ export function renderReport(report: DoctorReport): string {
   const lines = report.fixes.map((f) => `🔧 ${f.label} を起こした（${f.action}${f.ok ? "" : "・失敗"}）`);
   for (const check of report.checks) {
     const detail = check.detail === "" ? "" : `: ${check.detail}`;
-    const note = check.state === "unconfigured" ? "（未設定）" : "";
+    const note = check.state === "unconfigured" ? "（未設定）" : check.state === "unknown" ? "（未確認）" : "";
     const tail = check.ok ? "" : `  → ${check.hint}`;
     lines.push(`${mark(check)} ${check.name}${note}${detail}${tail}`);
   }
