@@ -34,6 +34,11 @@ describe("classifyUtterance: 人間の発話と注入されたものを分ける
   it("正常系: スキル本文の注入は injected", () => {
     expect(classifyUtterance("Base directory for this skill: /x")).toBe("injected");
   });
+  it("正常系: 下請け・別セッションからの報告は injected", () => {
+    const report =
+      'Another Claude session sent a message:\n<agent-message from="a1">\n[Subagent hand-back] 調査報告';
+    expect(classifyUtterance(report)).toBe("injected");
+  });
   it("Edge: 先頭の空白があっても判定できる", () => {
     expect(classifyUtterance("\n  <system-reminder>x")).toBe("injected");
   });
@@ -144,6 +149,17 @@ describe("humanUtterances / 入口", () => {
     const r = extractSession(raw);
     expect(r).not.toBe(null);
     expect(r && humanUtterances(r)).toEqual(["本物の発話"]);
+  });
+  it("★回帰: 下請けの報告を本人の発話に数えない（2026-09-22 実測で7番目に混ざっていた）", () => {
+    const raw = [
+      claudeLine({ type: "user", sessionId: "s", message: { content: "民間向けにこいつを参考にして作り直したい" } }),
+      claudeLine({
+        type: "user", sessionId: "s",
+        message: { content: 'Another Claude session sent a message:\n<agent-message from="a1">\n## 調査報告' },
+      }),
+    ].join("\n");
+    const r = extractSession(raw);
+    expect(r && humanUtterances(r)).toEqual(["民間向けにこいつを参考にして作り直したい"]);
   });
   it("Error: 形式が判定できなければ null", () => {
     expect(extractSession('{"unknown":1}')).toBe(null);
