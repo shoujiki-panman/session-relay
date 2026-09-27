@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- 下請けや別セッションからの報告（`Another Claude session sent a message:`）を、本人の発話に数えないようにした。Claude Code はこれを本人の発話と同じ user 行に記録するため、2026-09-22 の会話では「本人が実際に打った言葉」23件のうち7件が下請けの報告だった（直した後は16件）
+
 ## 0.4.0 - 2026-09-28
 
 - `relay deposits show [ref]`: スマホ等から預けた会話の中身をCLIで読む（省略で最新）。MCP の `get_deposit` と同じ中身を出し、既読にする。MCPを使わないエージェント向け
