@@ -1,7 +1,12 @@
-/** 受信箱（スマホ等から預けられた会話）の一覧と削除。読むのは relay mcp の get_deposit。 */
-import { type Inbox, createInbox } from "./inbox.ts";
+/**
+ * 受信箱（スマホ等から預けられた会話）の一覧・読み出し・削除。
+ * 読み出しは relay mcp の get_deposit と同じ中身を出す（MCPを使わないエージェント向け）。
+ */
+import { type Deposit, type Inbox, createInbox, renderDeposit } from "./inbox.ts";
+import { markRead } from "./unread.ts";
 
-const DEPOSITS_USAGE = "使い方: relay deposits（一覧）／ relay deposits rm <ref>（削除）\n";
+const DEPOSITS_USAGE =
+  "使い方: relay deposits（一覧）／ relay deposits show [ref]（中身・省略で最新）／ relay deposits rm <ref>（削除）\n";
 
 const when = (iso: string): string => iso.slice(5, 16).replace("T", " ");
 
@@ -19,8 +24,26 @@ function removeOne(inbox: Inbox, ref: string | undefined): number {
   return 0;
 }
 
-export function runDeposits(args: readonly string[], inbox: Inbox = createInbox()): number {
+function showOne(inbox: Inbox, ref: string | undefined, onRead: (deposit: Deposit) => void): number {
+  const found = inbox.get(ref);
+  if (found === null) {
+    process.stderr.write(
+      ref === undefined ? "受信箱は空です\n" : `refが1件に絞れません: ${ref}（relay deposits で一覧を確認）\n`,
+    );
+    return 1;
+  }
+  onRead(found);
+  process.stdout.write(`${renderDeposit(found)}\n`);
+  return 0;
+}
+
+export function runDeposits(
+  args: readonly string[],
+  inbox: Inbox = createInbox(),
+  onRead: (deposit: Deposit) => void = markRead,
+): number {
   if (args[0] === "rm") return removeOne(inbox, args[1]);
+  if (args[0] === "show" && args.length <= 2) return showOne(inbox, args[1], onRead);
   if (args.length > 0) {
     process.stderr.write(DEPOSITS_USAGE);
     return 2;

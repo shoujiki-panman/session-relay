@@ -29,6 +29,7 @@ metadata:
 本人が「スマホで預けた会話」「Claudeアプリから預けた続き」と明示した場合、
 MCPの `get_deposit` が見えていれば、まず引数なしで最新を読む。複数候補から
 選ぶ必要があるときだけ `list_deposits` を使う。通常の会話一覧とは混ぜない。
+MCPが見えなければ、CLIで `relay deposits show`（最新）／ `relay deposits`（一覧）を使う。
 
 ```bash
 relay --list
