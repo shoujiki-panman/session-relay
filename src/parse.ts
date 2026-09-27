@@ -32,6 +32,8 @@ const INJECTED_PREFIXES = [
   "[Request interrupted by user",
   "Base directory for this skill:",
   "Caveat: The messages below",
+  // 下請けや別セッションからの報告。Claude Codeは本人の発話と同じ user 行に記録する（実測）
+  "Another Claude session sent a message",
   // Codex（desktop）が毎ターン差し込む前置き
   "<recommended_plugins>",
   "<environment_context>",
