@@ -364,7 +364,8 @@ relay mcp-deposit
 このMCPに見える道具は `deposit_conversation` **1つだけ**。ローカルの会話を
 一覧・閲覧する道具は置かない。預けた内容は
 `~/.local/share/session-relay/inbox/` にディレクトリ `0700`・ファイル `0600` で保存する
-（上限100件）。届いた投函の一覧と削除は `relay deposits` ／ `relay deposits rm <ref>`。
+（上限100件）。届いた投函の一覧・中身・削除は `relay deposits` ／ `relay deposits show [ref]`（省略で最新）／ `relay deposits rm <ref>`。
+`show` は MCP の `get_deposit` と同じ中身を出すので、MCPを使わないエージェントもターミナルから読める。
 
 **起動時に未読を知らせる。** `relay unread` は、まだ読んでいない投函を1行で出す（無ければ黙る）。
 Claude Codeの起動時に自動で出すなら `~/.claude/settings.json` に:
