@@ -1,11 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 - 2026-09-28
 
 - `relay deposits show [ref]`: スマホ等から預けた会話の中身をCLIで読む（省略で最新）。MCP の `get_deposit` と同じ中身を出し、既読にする。MCPを使わないエージェント向け
-
-## 0.4.0 - 2026-09-24
-
 - `relay doctor` がトンネルも見るようにした。受け口が生きていてもトンネルが止まっていれば ✗ を出す（2026-09-22、止まっている間も「ぜんぶ通っています」と言っていた）
   - cloudflared の LaunchAgent が動いているか（`launchctl print`）と、`~/.cloudflared/config.yml` で受け口の port に向く公開ホスト名に HTTPS で届くか
   - Cloudflare Access の 302/401/403 は「届いている」、530（1033）・接続エラー・時間切れは「届いていない」
