@@ -2,7 +2,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { type Inbox, createInbox } from "./inbox.ts";
+import { DEPOSIT_SOURCES, type DepositSource, type Inbox, createInbox } from "./inbox.ts";
 
 interface ToolResult {
   [key: string]: unknown;
@@ -19,19 +19,36 @@ const reply = (text: string, ok = true): ToolResult => ({
 const errorText = (error: unknown): string =>
   error instanceof Error && !("code" in error) ? error.message : "保存に失敗しました";
 
-export function createDepositServer(inbox: Inbox = createInbox()): McpServer {
+/** 入口ごとに変えるもの。Alexa+は英語で話すので、説明と返事を差し替えられるようにする */
+export interface DepositServerOptions {
+  readonly source?: DepositSource;
+  readonly description?: string;
+  readonly confirm?: (ref: string) => string;
+  readonly failure?: (reason: string) => string;
+}
+
+const JA_DESCRIPTION =
+  "ユーザーが『この会話をrelayに預けて』『この続きをCodexでやりたい』と言ったときに使う。" +
+  "user_messagesには、この会話で本人が実際に打った発言を時系列で、要約・翻訳・言い換えせず原文のまま入れる。" +
+  "progressには直近の回答や決定を最大10件入れる。添付ファイル本体や非表示のツールデータは送らない。";
+
+const jaConfirm = (ref: string): string =>
+  `預けました。ref ${ref}\nMac側では get_deposit にこのrefを渡すか、refなしで最新を読めます。`;
+
+const jaFailure = (reason: string): string => `預けられませんでした: ${reason}`;
+
+export function createDepositServer(inbox: Inbox = createInbox(), options: DepositServerOptions = {}): McpServer {
   const server = new McpServer({ name: "relay-deposit", version: "0.2.5" });
+  const confirm = options.confirm ?? jaConfirm;
+  const failure = options.failure ?? jaFailure;
   server.registerTool(
     "deposit_conversation",
     {
       title: "この会話をrelayに預ける",
-      description:
-        "ユーザーが『この会話をrelayに預けて』『この続きをCodexでやりたい』と言ったときに使う。" +
-        "user_messagesには、この会話で本人が実際に打った発言を時系列で、要約・翻訳・言い換えせず原文のまま入れる。" +
-        "progressには直近の回答や決定を最大10件入れる。添付ファイル本体や非表示のツールデータは送らない。",
+      description: options.description ?? JA_DESCRIPTION,
       inputSchema: {
         title: z.string().max(120).optional().describe("会話の短い題名"),
-        source: z.enum(["claude-mobile", "claude-web", "other"]).default("claude-mobile"),
+        source: z.enum(DEPOSIT_SOURCES).default(options.source ?? "claude-mobile"),
         user_messages: z.array(z.string().max(65_536)).min(1).max(200),
         progress: z.array(z.string().max(65_536)).max(10).default([]),
       },
@@ -39,11 +56,9 @@ export function createDepositServer(inbox: Inbox = createInbox()): McpServer {
     ({ title, source, user_messages: userMessages, progress }) => {
       try {
         const saved = inbox.put({ ...(title === undefined ? {} : { title }), source, userMessages, progress });
-        return reply(
-          `預けました。ref ${saved.id}\nMac側では get_deposit にこのrefを渡すか、refなしで最新を読めます。`,
-        );
+        return reply(confirm(saved.id));
       } catch (error) {
-        return reply(`預けられませんでした: ${errorText(error)}`, false);
+        return reply(failure(errorText(error)), false);
       }
     },
   );

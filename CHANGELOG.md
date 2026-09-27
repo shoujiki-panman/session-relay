@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `relay mcp-deposit-alexa`: Alexa+（米国・英語）から会話を預ける入口。Claude用とは別ポート（8789）・別ホスト名で動かし、Amazon Cognitoのアクセストークンで守る（署名・発行元・token_use・client_id・scope・本人のsubまで検証）。未認証は401で `WWW-Authenticate` を付けない（Alexa+の決まり）。OAuthのメタデータを `/.well-known/` に置く。手順は `docs/alexa-plus-ja.md`
+- 預けた会話の出典に `alexa` を追加。預ける道具の説明文と返事を入口ごとに差し替えられるようにした（Alexa+向けは英語）
+
 ## 0.4.0 - 2026-09-28
 
 - `relay deposits show [ref]`: スマホ等から預けた会話の中身をCLIで読む（省略で最新）。MCP の `get_deposit` と同じ中身を出し、既読にする。MCPを使わないエージェント向け
