@@ -1,0 +1,14 @@
+{
+  "name": "shoujiki-panman",
+  "owner": {
+    "name": "shoujiki-panman",
+    "url": "https://github.com/shoujiki-panman"
+  },
+  "plugins": [
+    {
+      "name": "session-relay",
+      "source": "./plugins/session-relay",
+      "description": "Pick up where your last AI coding session left off, without writing a handoff note."
+    }
+  ]
+}
