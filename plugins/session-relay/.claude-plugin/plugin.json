@@ -9,12 +9,23 @@
   },
   "homepage": "https://github.com/shoujiki-panman/session-relay",
   "repository": "https://github.com/shoujiki-panman/session-relay",
+  "privacyPolicyUrl": "https://github.com/shoujiki-panman/session-relay/blob/main/PRIVACY.md",
   "license": "MIT",
-  "keywords": ["handoff", "context", "session", "resume", "codex"],
+  "keywords": [
+    "handoff",
+    "context",
+    "session",
+    "resume",
+    "codex"
+  ],
   "mcpServers": {
     "relay": {
       "command": "npx",
-      "args": ["-y", "@shoujiki-panman/session-relay@0.4.1", "mcp"]
+      "args": [
+        "-y",
+        "@shoujiki-panman/session-relay@0.4.1",
+        "mcp"
+      ]
     }
   }
 }
