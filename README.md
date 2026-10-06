@@ -34,6 +34,13 @@ relay install
 relay doctor     # 登録と生存（受け口・トンネル）の検査。繋がらない時もまずこれ。--fix で落ちた常駐を起こす
 ```
 
+Claude Codeだけで使うなら、プラグインとしても入れられます（スキルとMCPだけ。`/clear` フックやスマホからの投函は入りません）。
+
+```sh
+claude plugin marketplace add shoujiki-panman/session-relay
+claude plugin install session-relay@shoujiki-panman
+```
+
 git cloneで開発版を使う場合は、`bin/relay.js` が `src/` の `.ts` を直接読むため
 **Node.js 22.18以降**が要ります（npm版はビルド済みの `dist/` を使うので20で動きます）。
 

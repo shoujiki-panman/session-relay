@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Claude Codeのプラグインとして入れられるようにした（`plugins/session-relay`：「続きから」スキルとMCP。MCPは `npx` でnpmの同じ版に固定して起動する）。Anthropicのプラグイン一覧（Anthropic Directory）に出すための形
+
 ## 0.4.1 - 2026-09-28
 
 - 下請けや別セッションからの報告（`Another Claude session sent a message:`）を、本人の発話に数えないようにした。Claude Code はこれを本人の発話と同じ user 行に記録するため、2026-09-22 の会話では「本人が実際に打った言葉」23件のうち7件が下請けの報告だった（直した後は16件）
