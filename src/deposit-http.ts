@@ -4,7 +4,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import express, { type ErrorRequestHandler, type RequestHandler } from "express";
 import { localhostHostValidation } from "@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js";
 import { type AccessVerifier } from "./cloudflare-access.ts";
-import { createDepositServer } from "./deposit-mcp.ts";
+import { type DepositServerOptions, createDepositServer } from "./deposit-mcp.ts";
 import { type Inbox, createInbox } from "./inbox.ts";
 
 export const DEFAULT_DEPOSIT_PORT = 8788;
@@ -15,7 +15,7 @@ interface DepositHttpOptions {
   readonly inbox?: Inbox;
 }
 
-const rpcError = (message: string): object => ({
+export const rpcError = (message: string): object => ({
   jsonrpc: "2.0",
   error: { code: -32_000, message },
   id: null,
@@ -37,25 +37,17 @@ function requireAccess(verify: AccessVerifier): RequestHandler {
   };
 }
 
-const bodyError: ErrorRequestHandler = (error, request, response, next) => {
+export const bodyError: ErrorRequestHandler = (error, request, response, next) => {
   void error;
   void request;
   void next;
   response.status(400).json(rpcError("Invalid JSON request"));
 };
 
-export function createDepositHttpApp(options: DepositHttpOptions): express.Express {
-  const inbox = options.inbox ?? createInbox();
-  const app = express();
-  app.disable("x-powered-by");
-  app.use(localhostHostValidation());
-  app.get("/healthz", (_request, response) => {
-    response.json({ ok: true });
-  });
-  app.use("/mcp", requireAccess(options.verifyAccess));
-  app.use("/mcp", express.json({ limit: "1mb" }));
-  app.post("/mcp", async (request, response) => {
-    const server = createDepositServer(inbox);
+/** 1リクエストごとにMCPサーバーを作って捨てる。どの入口も同じ「預ける道具1つ」だけを出す */
+export function depositPostHandler(inbox: Inbox, serverOptions: DepositServerOptions = {}): RequestHandler {
+  return async (request, response) => {
+    const server = createDepositServer(inbox, serverOptions);
     // sessionIdGeneratorを渡さない＝ステートレス（公式の `sessionIdGenerator: undefined` と同じ）
     const transport = new StreamableHTTPServerTransport({});
     try {
@@ -69,27 +61,47 @@ export function createDepositHttpApp(options: DepositHttpOptions): express.Expre
     } finally {
       await server.close();
     }
-  });
+  };
+}
+
+/** /mcp のPOST以外は受けない。GET（SSE）とDELETE（セッション終了）はステートレスなので不要 */
+export function closeOtherMethods(app: express.Express): void {
   app.get("/mcp", (_request, response) => response.status(405).json(rpcError("Method not allowed")));
   app.delete("/mcp", (_request, response) => response.status(405).json(rpcError("Method not allowed")));
+}
+
+export function createDepositHttpApp(options: DepositHttpOptions): express.Express {
+  const inbox = options.inbox ?? createInbox();
+  const app = express();
+  app.disable("x-powered-by");
+  app.use(localhostHostValidation());
+  app.get("/healthz", (_request, response) => {
+    response.json({ ok: true });
+  });
+  app.use("/mcp", requireAccess(options.verifyAccess));
+  app.use("/mcp", express.json({ limit: "1mb" }));
+  app.post("/mcp", depositPostHandler(inbox));
+  closeOtherMethods(app);
   app.use(bodyError);
   return app;
 }
 
-export function depositPort(environment: NodeJS.ProcessEnv = process.env): number {
-  const raw = environment.SESSION_RELAY_DEPOSIT_PORT?.trim();
-  if (!raw) return DEFAULT_DEPOSIT_PORT;
-  if (!/^\d+$/.test(raw)) throw new Error("SESSION_RELAY_DEPOSIT_PORTは整数にしてください");
-  const port = Number(raw);
+/** 環境変数のポート指定を厳密に読む。無ければfallback */
+export function portFrom(raw: string | undefined, fallback: number, name: string): number {
+  const given = raw?.trim();
+  if (!given) return fallback;
+  if (!/^\d+$/.test(given)) throw new Error(`${name}は整数にしてください`);
+  const port = Number(given);
   if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) throw new Error("ポートは1〜65535です");
   return port;
 }
 
-export async function listenForDeposits(
-  options: DepositHttpOptions,
-  port: number = depositPort(),
-): Promise<HttpServer> {
-  const app = createDepositHttpApp(options);
+export function depositPort(environment: NodeJS.ProcessEnv = process.env): number {
+  return portFrom(environment.SESSION_RELAY_DEPOSIT_PORT, DEFAULT_DEPOSIT_PORT, "SESSION_RELAY_DEPOSIT_PORT");
+}
+
+/** 127.0.0.1だけで待つ。外からはTunnel経由でしか届かない */
+export async function listenOnLoopback(app: express.Express, port: number): Promise<HttpServer> {
   return await new Promise((resolve, reject) => {
     const server = app.listen(port, LOOPBACK);
     server.once("error", reject);
@@ -97,4 +109,11 @@ export async function listenForDeposits(
       resolve(server);
     });
   });
+}
+
+export async function listenForDeposits(
+  options: DepositHttpOptions,
+  port: number = depositPort(),
+): Promise<HttpServer> {
+  return await listenOnLoopback(createDepositHttpApp(options), port);
 }

@@ -26,7 +26,8 @@ const MAX_TOTAL_BYTES = 256 * 1024;
 const MAX_FILE_BYTES = 300 * 1024;
 const FILE_NAME = /^[0-9a-f-]{36}\.json$/i;
 
-export type DepositSource = "claude-mobile" | "claude-web" | "other";
+export const DEPOSIT_SOURCES = ["claude-mobile", "claude-web", "alexa", "other"] as const;
+export type DepositSource = (typeof DEPOSIT_SOURCES)[number];
 
 export interface DepositInput {
   readonly title?: string;
@@ -97,7 +98,7 @@ const strings = (value: unknown): string[] | null => {
 };
 
 function sourceOf(value: unknown): DepositSource | null {
-  return value === "claude-mobile" || value === "claude-web" || value === "other" ? value : null;
+  return DEPOSIT_SOURCES.find((source) => source === value) ?? null;
 }
 
 function parseDeposit(raw: string): Deposit | null {

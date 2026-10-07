@@ -6,6 +6,7 @@
  *   relay mcp                 MCPサーバーとして話す（AIが自分で取りに来る側）
  *   relay mcp-deposit         会話を預けるだけのMCP（外向き候補）
  *   relay mcp-deposit-http    Cloudflare Access必須のリモート投函口
+ *   relay mcp-deposit-alexa   Alexa+向けの投函口（Cognitoのtoken必須）
  *   relay mark                いまの会話に「次はこれ」の印をつける（起動しない）
  *   relay hook                Claude Codeのフック用（/clear の前後をつなぐ）
  *   relay show <session.jsonl>
@@ -51,7 +52,9 @@ const entry =
       ? "deposit-mcp-main"
       : args[0] === "mcp-deposit-http"
         ? "deposit-http-main"
-        : "cli";
+        : args[0] === "mcp-deposit-alexa"
+          ? "alexa-http-main"
+          : "cli";
 // cli 側は先頭に「何をするか」を要求する。`relay --print` のように省かれたら足す
 if (entry === "cli" && !["show", "install", "deposits", "doctor", "unread", "mark", "hook"].includes(args[0])) process.argv.splice(2, 0, "relay");
 
