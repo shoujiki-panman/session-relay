@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 渡す文脈と預けた会話から、鍵やトークンの形をした文字列を伏せるようにした（`[伏せた: 種類]`）。Anthropic・OpenAI・GitHub・npm・AWS・Google・Slack・Stripeの鍵、JWT、Bearerトークン、秘密鍵。形で分かるものだけで、言葉からの推測はしない。手元の記録は書き換えない。手元の記録116本に当てると、伏せたのは本物のJWT 2件だけだった
 - Claude Codeのプラグインとして入れられるようにした（`plugins/session-relay`：「続きから」スキルとMCP。MCPは `npx` でnpmの同じ版に固定して起動する）。Anthropicのプラグイン一覧（Anthropic Directory）に出すための形
 
 ## 0.4.1 - 2026-09-28

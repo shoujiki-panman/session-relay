@@ -22,6 +22,7 @@ import {
   noSuchRef,
 } from "./mcp-answers.ts";
 import { pickProject } from "./projects.ts";
+import { redactSecrets } from "./redact.ts";
 import { chooseByKey, contextOf, findByWords, previousIn, projectsOf } from "./query.ts";
 import { type Deposit, type Inbox, createInbox, renderDeposit } from "./inbox.ts";
 
@@ -32,8 +33,9 @@ interface ToolResult {
   isError?: boolean;
 }
 
+/** 出口で伏せる。一覧の見出しや検索の当たりにも本人が貼った鍵が混ざりうるので、文脈だけでなく全部 */
 const reply = (answer: Answer): ToolResult => ({
-  content: [{ type: "text", text: answer.text }],
+  content: [{ type: "text", text: redactSecrets(answer.text) }],
   ...(answer.ok ? {} : { isError: true }),
 });
 
