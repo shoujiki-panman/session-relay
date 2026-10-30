@@ -8,6 +8,7 @@
  * 置き方（Claude Code / Codex / Cursor いずれも stdio）:
  *   claude mcp add relay -- relay mcp
  */
+import { statSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -23,7 +24,8 @@ import {
 } from "./mcp-answers.ts";
 import { pickProject } from "./projects.ts";
 import { redactSecrets } from "./redact.ts";
-import { chooseByKey, contextOf, findByWords, previousIn, projectsOf } from "./query.ts";
+import { SCAN, chooseByKey, contextOf, findByWords, humanSessions, previousIn, projectsOf } from "./query.ts";
+import { answerRecent, depositActivity, sessionActivity, sinceOf } from "./recent.ts";
 import { type Deposit, type Inbox, createInbox, renderDeposit } from "./inbox.ts";
 
 /** SDKが受け取る形。書き換え可の配列＋追加項目を許す形でないと通らない */
@@ -169,6 +171,51 @@ function addDepositReadTool(server: McpServer, inbox: Inbox): void {
   );
 }
 
+/** 記録が消えていたら、その会話は「動いていない」ものとして扱う（一覧から落とす） */
+const mtimeOf = (path: string): number => {
+  try {
+    return statSync(path).mtimeMs;
+  } catch {
+    return 0;
+  }
+};
+
+/**
+ * 最近どのAIと何を話したかを、手元の会話と預かった会話をまとめて返す。
+ * 手元のMacの中だけで答える道具なので、外向きの投函口には載せない（外から一覧を読めるようにするかは別に決める）。
+ */
+function addRecentTool(server: McpServer, inbox: Inbox): void {
+  server.registerTool(
+    "list_recent_activity",
+    {
+      title: "最近どのAIと何を話したか",
+      description:
+        "この人が最近どのAIと何を話したかを、Claude Code・Codex の会話と、Dots やスマホの Claude から預けた会話を" +
+        "まとめて新しい順に返す。『最近どのAIと何を話した？』『昨日から何があった？』と聞かれたら使う。" +
+        "since より後に動いたものだけを返すので、全部を読み直さなくていい。中身は各行の get_context / get_deposit で読む。",
+      inputSchema: {
+        since: z
+          .string()
+          .optional()
+          .describe("この日時より後に動いたものだけ返す（ISO 8601。例 2026-10-30T09:00:00+09:00）"),
+        hours: z
+          .number()
+          .optional()
+          .describe("since の代わりに、何時間前からかで指定する。両方省略すると24時間"),
+      },
+    },
+    ({ since, hours }) => {
+      const from = sinceOf(since, hours, Date.now());
+      if (from === null) {
+        return reply({ ok: false, text: "since か hours が読めませんでした。ISO 8601 の日時か、正の時間数を渡してください。" });
+      }
+      const sessions = humanSessions(SCAN, null).map((row) => sessionActivity(row, mtimeOf(row.path)));
+      const deposits = inbox.list().map(depositActivity);
+      return reply(answerRecent([...sessions, ...deposits], from));
+    },
+  );
+}
+
 /** 外から明示的に預けた会話を読む。外向きの投函MCPとはサーバーごと分ける。 */
 function addInboxTools(server: McpServer, inbox: Inbox): void {
   addDepositListTool(server, inbox);
@@ -199,6 +246,7 @@ export function createServer(inbox: Inbox = createInbox()): McpServer {
   addContextTool(server);
   addListTools(server);
   addInboxTools(server, inbox);
+  addRecentTool(server, inbox);
   addResumePrompt(server);
   return server;
 }

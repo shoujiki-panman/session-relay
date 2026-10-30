@@ -25,7 +25,7 @@ afterAll(async () => {
   await client.close();
 });
 
-it("stdioで繋がって、通常の会話と預けた会話を読む5つの道具が見える", async () => {
+it("stdioで繋がって、通常の会話と預けた会話を読む6つの道具が見える", async () => {
   const { tools } = await client.listTools();
   expect(tools.map((tool) => tool.name).sort()).toEqual([
     "get_context",
@@ -33,7 +33,14 @@ it("stdioで繋がって、通常の会話と預けた会話を読む5つの道�
     "list_conversations",
     "list_deposits",
     "list_projects",
+    "list_recent_activity",
   ]);
+});
+
+it("list_recent_activity は引数なしで呼べる（「最近どのAIと何を話した？」がそのまま通るため）", async () => {
+  const { tools } = await client.listTools();
+  const recent = tools.find((tool) => tool.name === "list_recent_activity");
+  expect(recent?.inputSchema.required ?? []).toEqual([]);
 });
 
 it("get_context は引数なしで呼べる（「続きから」がそのまま通るため）", async () => {

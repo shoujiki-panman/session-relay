@@ -350,6 +350,7 @@ codex mcp add relay -- /絶対パス/bin/relay.js mcp
 | `list_conversations` | そのプロジェクトの会話と `ref` |
 | `list_deposits` | スマホ等から明示的に預けた会話の一覧 |
 | `get_deposit` | ref指定、または指定なしで最新の預けた会話を返す |
+| `list_recent_activity` | 最近どのAIと何を話したか。Claude Code・Codex の会話と預けた会話を、`since`（日時）か `hours` より後に動いた分だけ新しい順に返す（既定は24時間・最大30件）。中身は各行の `get_context` / `get_deposit` で読む |
 
 `ref` を必ず書いて返している。書かないと、AIはもう一度自分で探しに行く。
 

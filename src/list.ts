@@ -172,7 +172,7 @@ function topicOf(utterances: readonly string[]): string {
   return shown.length > 44 ? `${shown.slice(0, 44)}…` : shown;
 }
 
-const stamp = (mtimeMs: number): string => {
+export const stamp = (mtimeMs: number): string => {
   const at = new Date(mtimeMs);
   const pad = (n: number): string => String(n).padStart(2, "0");
   return `${pad(at.getMonth() + 1)}/${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
