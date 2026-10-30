@@ -25,6 +25,8 @@ import { pickProject } from "./projects.ts";
 import { redactSecrets } from "./redact.ts";
 import { chooseByKey, contextOf, findByWords, previousIn, projectsOf } from "./query.ts";
 import { type Deposit, type Inbox, createInbox, renderDeposit } from "./inbox.ts";
+import { type Board, createBoard } from "./board.ts";
+import { addBoardTools } from "./board-tools.ts";
 
 /** SDKが受け取る形。書き換え可の配列＋追加項目を許す形でないと通らない */
 interface ToolResult {
@@ -194,11 +196,12 @@ function addResumePrompt(server: McpServer): void {
   );
 }
 
-export function createServer(inbox: Inbox = createInbox()): McpServer {
+export function createServer(inbox: Inbox = createInbox(), board: Board = createBoard()): McpServer {
   const server = new McpServer({ name: "relay", version: "0.2.5" });
   addContextTool(server);
   addListTools(server);
   addInboxTools(server, inbox);
+  addBoardTools(server, board);
   addResumePrompt(server);
   return server;
 }
