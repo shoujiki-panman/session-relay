@@ -14,6 +14,8 @@ This policy covers the Claude Code plugin (`plugins/session-relay`) and the npm 
 
 It reads these only when Claude calls one of its tools, and returns what it read only to the Claude session you are using.
 
+Before returning anything, it replaces strings shaped like well-known keys and tokens (Anthropic, OpenAI, GitHub, npm, AWS, Google, Slack and Stripe keys, JWTs, Bearer tokens and private keys) with a placeholder such as `[伏せた: GitHubのトークン]`. This is best effort: a secret in an unrecognised shape is not caught. Your logs on disk are not changed.
+
 ## What the plugin stores
 
 - `~/.cache/session-relay/list.json`: a list of your conversations. For each one it keeps the folder it took place in, a title (up to 44 characters of what you typed), and up to 400 characters of what you typed, lower-cased, for searching. It exists so the list does not have to be rebuilt from every log each time. Deleting it is safe; it is rebuilt when needed.
