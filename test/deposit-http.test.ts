@@ -7,6 +7,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { depositPort, listenForDeposits } from "../src/deposit-http.ts";
+import { createBoard } from "../src/board.ts";
 import { createInbox } from "../src/inbox.ts";
 
 const TOKEN = "signed-by-access";
@@ -20,7 +21,7 @@ let endpoint = new URL("http://127.0.0.1/");
 let server: Awaited<ReturnType<typeof listenForDeposits>>;
 
 beforeAll(async () => {
-  server = await listenForDeposits({ verifyAccess, inbox }, 0);
+  server = await listenForDeposits({ verifyAccess, inbox, board: createBoard(join(root, "board")) }, 0);
   const address = server.address();
   if (address === null || typeof address === "string") throw new Error("HTTPポートを取得できません");
   endpoint = new URL(`http://127.0.0.1:${String(address.port)}/mcp`);
@@ -74,9 +75,9 @@ function postWithHost(host: string): Promise<number> {
   });
 }
 
-it("HTTP投函口には預ける道具しか見えない", async () => {
+it("HTTP投函口には、預ける道具と伝言板しか見えない（手元の会話を読む道具は出さない）", async () => {
   const { tools } = await client.listTools();
-  expect(tools.map((tool) => tool.name)).toEqual(["deposit_conversation"]);
+  expect(tools.map((tool) => tool.name).sort()).toEqual(["deposit_conversation", "post_message", "read_messages"]);
 });
 
 it("HTTP越しに本人の原文を預ける", async () => {

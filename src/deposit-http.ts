@@ -4,6 +4,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import express, { type ErrorRequestHandler, type RequestHandler } from "express";
 import { localhostHostValidation } from "@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js";
 import { type AccessVerifier } from "./cloudflare-access.ts";
+import { type Board, createBoard } from "./board.ts";
 import { type DepositServerOptions, createDepositServer } from "./deposit-mcp.ts";
 import { type Inbox, createInbox } from "./inbox.ts";
 
@@ -13,6 +14,7 @@ const LOOPBACK = "127.0.0.1";
 interface DepositHttpOptions {
   readonly verifyAccess: AccessVerifier;
   readonly inbox?: Inbox;
+  readonly board?: Board;
 }
 
 export const rpcError = (message: string): object => ({
@@ -44,10 +46,14 @@ export const bodyError: ErrorRequestHandler = (error, request, response, next) =
   response.status(400).json(rpcError("Invalid JSON request"));
 };
 
-/** 1リクエストごとにMCPサーバーを作って捨てる。どの入口も同じ「預ける道具1つ」だけを出す */
-export function depositPostHandler(inbox: Inbox, serverOptions: DepositServerOptions = {}): RequestHandler {
+/** 1リクエストごとにMCPサーバーを作って捨てる。boardがnullなら「預ける道具1つ」だけを出す */
+export function depositPostHandler(
+  inbox: Inbox,
+  board: Board | null,
+  serverOptions: DepositServerOptions = {},
+): RequestHandler {
   return async (request, response) => {
-    const server = createDepositServer(inbox, serverOptions);
+    const server = createDepositServer(inbox, board, serverOptions);
     // sessionIdGeneratorを渡さない＝ステートレス（公式の `sessionIdGenerator: undefined` と同じ）
     const transport = new StreamableHTTPServerTransport({});
     try {
@@ -72,6 +78,7 @@ export function closeOtherMethods(app: express.Express): void {
 
 export function createDepositHttpApp(options: DepositHttpOptions): express.Express {
   const inbox = options.inbox ?? createInbox();
+  const board = options.board ?? createBoard();
   const app = express();
   app.disable("x-powered-by");
   app.use(localhostHostValidation());
@@ -80,7 +87,7 @@ export function createDepositHttpApp(options: DepositHttpOptions): express.Expre
   });
   app.use("/mcp", requireAccess(options.verifyAccess));
   app.use("/mcp", express.json({ limit: "1mb" }));
-  app.post("/mcp", depositPostHandler(inbox));
+  app.post("/mcp", depositPostHandler(inbox, board));
   closeOtherMethods(app);
   app.use(bodyError);
   return app;

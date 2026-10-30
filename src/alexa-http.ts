@@ -89,7 +89,7 @@ export function createAlexaHttpApp(options: AlexaHttpOptions): express.Express {
   serveMetadata(app, options.config);
   app.use("/mcp", requireBearer(options.verifyToken));
   app.use("/mcp", express.json({ limit: "1mb" }));
-  app.post("/mcp", depositPostHandler(inbox, ALEXA_TOOL));
+  app.post("/mcp", depositPostHandler(inbox, null, ALEXA_TOOL));
   closeOtherMethods(app);
   app.use(bodyError);
   return app;

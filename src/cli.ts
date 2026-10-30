@@ -15,6 +15,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { runHook } from "./hook.ts";
 import { type Destination, describeLaunch, destinationOf, launchArgs } from "./launch.ts";
 import { quitQuietlyOnBrokenPipe } from "./pipe.ts";
@@ -28,6 +29,7 @@ import { runShow } from "./show-cli.ts";
 import { canvas, page, records } from "./exports.ts";
 import { groupByProject, pickProject, renderProjects } from "./projects.ts";
 import { buildContext } from "./context.ts";
+import { toShareable } from "./share.ts";
 import { renderTable } from "./list.ts";
 import { pickInteractively } from "./run-picker.ts";
 import { readRepoSignals } from "./repo.ts";
@@ -167,6 +169,7 @@ async function relay(
   from: string | null,
   picking: Picking,
   inKey: string | null,
+  share = false,
 ): Promise<number> {
   const cwd = process.cwd();
   const context = await chooseContext(usePrevious, from, picking, cwd, inKey);
@@ -175,7 +178,7 @@ async function relay(
     return 1;
   }
   if (printOnly) {
-    process.stdout.write(context);
+    process.stdout.write(share ? (toShareable(context, homedir()) ?? context) : context);
     return 0;
   }
   process.stderr.write(
@@ -253,6 +256,7 @@ if (command === "install") {
       from,
       picking,
       inKey,
+      args.includes("--share"),
     );
   }
 } else if (command === "deposits") {

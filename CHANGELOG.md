@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- エージェントの伝言板：MCP の道具 `post_message` / `read_messages`。Dots・Muse・Claude Code などが同じ伝言板に書いて読み合う。外向きの受け口と手元のMCPの両方に載せる。外から読めるのは伝言板に書かれたものだけで、手元の会話は今までどおり外から読めない。書かれた伝言は保存する前に鍵を伏せる。`read_messages` は since より後の分だけ（既定24時間）、to で自分あてと全員あてに絞る。500件を超えたら古いものから消す
+
+## 0.4.3 - 2026-10-30
+
+- `relay --print --share`：共有の場所（Googleドライブの共有フォルダなど）に置ける形で書き出す。本人の言葉は全部、AIの報告は最後の3ターン（600字まで）。手元のパス・画像の置き場所・コマンドの中身・触ったファイルとコマンドの節を外し、鍵を伏せる。手元の会話で試すと 69KB が 5KB になり、ユーザー名入りのパスは0件だった
+
 ## 0.4.2 - 2026-10-30
 
 - `relay mcp-deposit-alexa`: Alexa+（米国・英語）から会話を預ける入口。Claude用とは別ポート（8789）・別ホスト名で動かし、Amazon Cognitoのアクセストークンで守る（署名・発行元・token_use・client_id・scope・本人のsubまで検証）。未認証は401で `WWW-Authenticate` を付けない（Alexa+の決まり）。OAuthのメタデータを `/.well-known/` に置く。手順は `docs/alexa-plus-ja.md`

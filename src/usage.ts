@@ -11,6 +11,7 @@ export const USAGE = `会話を別スレッド／別ハーネスへ渡す
   relay --to codex --model <名前>  モデルを指定して開く（重いモデルで決めて、軽いモデルで回す）
   relay --print              文脈だけ出す（貼りたいとき）
   relay --print --previous   自分ではなく「直前の会話」を引く
+  relay --print --share      共有の場所に置ける形で出す（手元のパス・コマンドを外し、鍵を伏せる）
   relay mark                 いまの会話に「次はこれ」の印をつける（起動しない）
   relay mark --recent        場所を問わず、最後に動いていた会話に印をつける
   relay mark --show          いま印がついている会話を見る
@@ -57,6 +58,7 @@ const TAKES_VALUE = new Set([
 const KNOWN = new Set([
   ...TAKES_VALUE,
   "--print",
+  "--share",
   "--previous",
   "--all",
   "--dry-run",
