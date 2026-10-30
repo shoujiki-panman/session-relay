@@ -26,6 +26,10 @@ export const USAGE = `会話を別スレッド／別ハーネスへ渡す
   relay --canvas [出力先]    プロジェクトと会話を .canvas に書き出す
   relay --records <場所>     一覧を1会話＝1ファイルで書き出す（画面から選ぶ用）
 
+  relay board post --from <名前> [--to <相手>] <伝言>
+                             エージェントの伝言板に書く（Dots など、MCPを使わないAI向け）
+  relay board read [--to <名前>] [--since <日時> | --hours <時間>]
+                             伝言板を読む（省略で24時間前から）
   relay deposits [show [ref] | rm <ref>]
                              スマホ等から預けられた会話の一覧／中身（省略で最新）／削除
   relay mcp                  MCPサーバーとして話す（AIが自分で取りに来る）

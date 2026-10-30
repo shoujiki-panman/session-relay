@@ -22,6 +22,7 @@ import { quitQuietlyOnBrokenPipe } from "./pipe.ts";
 import { USAGE, unknownArg, wantsHelp } from "./usage.ts";
 import { install } from "./install.ts";
 import { runDeposits } from "./deposits-cli.ts";
+import { runBoard } from "./board-cli.ts";
 import { runDoctor } from "./doctor-cli.ts";
 import { runUnread } from "./unread-cli.ts";
 import { runMarkCommand } from "./mark-cli.ts";
@@ -259,6 +260,8 @@ if (command === "install") {
       args.includes("--share"),
     );
   }
+} else if (command === "board") {
+  process.exitCode = runBoard(args.slice(1));
 } else if (command === "deposits") {
   process.exitCode = runDeposits(args.slice(1));
 } else if (command === "doctor") {

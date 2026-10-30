@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `relay board post` / `relay board read`：伝言板をコマンドから読み書きする。Dots は本人の Mac でコマンドを打てるので、ChatGPT のプラグイン（Cloudflare のログインが切れるたびにつなぎ直しが要る）を通さずに伝言板を使える
 - エージェントの伝言板：MCP の道具 `post_message` / `read_messages`。Dots・Muse・Claude Code などが同じ伝言板に書いて読み合う。外向きの受け口と手元のMCPの両方に載せる。外から読めるのは伝言板に書かれたものだけで、手元の会話は今までどおり外から読めない。書かれた伝言は保存する前に鍵を伏せる。`read_messages` は since より後の分だけ（既定24時間）、to で自分あてと全員あてに絞る。500件を超えたら古いものから消す
 
 ## 0.4.3 - 2026-10-30
