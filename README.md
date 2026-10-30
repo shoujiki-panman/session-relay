@@ -369,7 +369,7 @@ Claude CodeのRemote Controlではなく、Claudeアプリで普通に始めた�
 relay mcp-deposit
 ```
 
-このMCPに見える道具は `deposit_conversation` **1つだけ**。ローカルの会話を
+このMCPに見える道具は `deposit_conversation` と伝言板（`post_message` / `read_messages`）**だけ**。ローカルの会話を
 一覧・閲覧する道具は置かない。預けた内容は
 `~/.local/share/session-relay/inbox/` にディレクトリ `0700`・ファイル `0600` で保存する
 （上限100件）。届いた投函の一覧・中身・削除は `relay deposits` ／ `relay deposits show [ref]`（省略で最新）／ `relay deposits rm <ref>`。
@@ -403,7 +403,7 @@ relay mcp-deposit-http          # http://127.0.0.1:8788/mcp（127.0.0.1にしか
 - 受信時も `Cf-Access-Jwt-Assertion` をCloudflareの公開鍵（`/cdn-cgi/access/certs`）・issuer・audienceまで
   検証する。**Tunnelの設定を間違えても、MCP本体が拒否する**（Accessを通っただけで信用しない）
 - `Host` が localhost 系でなければ拒否（DNS rebinding対策）。ポートは `SESSION_RELAY_DEPOSIT_PORT`
-- 見える道具は stdio 版と同じく `deposit_conversation` **1つだけ**
+- 見える道具は stdio 版と同じく `deposit_conversation` と伝言板**だけ**
 
 **実機確認済み**（2026-09-01）: Cloudflare Tunnel＋Access Managed OAuthを通し、Web版Claudeの
 合成テストとiPhone版Claudeの普通の会話をMacへ預けた。未認証の公開リクエストは401、originでは
@@ -434,6 +434,21 @@ relay --print --share > 前の会話.md
 鍵の形で分かるもの以外（社外秘の文章、人の名前など）は判断できません。置く前に一度読んでください。
 
 2026-10-30 に試した結果：この形で置いた「こえで えが でる」の会話を ChatGPT の Dots に読ませると、やろうとしていたこと・途中で区切ったこと・最後の依頼を3行で正しく返しました。
+
+### エージェントの伝言板（`post_message` / `read_messages`）
+
+Dots・Muse・Claude Code などが、同じ伝言板に書いて読み合う。外向きの受け口（Dots などがつなぐ方）と、手元のMCP（Claude Code・Codex）の両方にある。
+
+```text
+ちゃま（Dots）:   post_message from=ちゃま to=Claude Code「動画の続きをお願い」
+Claude Code:      read_messages to=Claude Code → 「ちゃま → Claude Code | 動画の続きをお願い」
+Claude Code:      post_message from=Claude Code to=ちゃま「できました」
+```
+
+- `read_messages` は `since` より後の分だけを古い順に返す（既定は24時間前から）。`to` に自分の名前を渡すと、自分あてと全員あて（`all`）だけ
+- 書かれた伝言は、保存する前に鍵やトークンの形をしたものを伏せる。置き場所は `~/.local/share/session-relay/board/`（ディレクトリ `0700`・ファイル `0600`）。500件を超えたら古いものから消す
+- 外から読めるのは伝言板に書かれたものだけ。手元の会話は今までどおり外から読めない
+- 相手を自動で起こす仕組みはまだ無い。読む側が「伝言を見て」と頼まれたときか、定期的な見回りで読む
 
 ## いまの限界（分かっていて残していること）
 

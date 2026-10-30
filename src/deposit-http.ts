@@ -4,6 +4,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import express, { type ErrorRequestHandler, type RequestHandler } from "express";
 import { localhostHostValidation } from "@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js";
 import { type AccessVerifier } from "./cloudflare-access.ts";
+import { type Board, createBoard } from "./board.ts";
 import { createDepositServer } from "./deposit-mcp.ts";
 import { type Inbox, createInbox } from "./inbox.ts";
 
@@ -13,6 +14,7 @@ const LOOPBACK = "127.0.0.1";
 interface DepositHttpOptions {
   readonly verifyAccess: AccessVerifier;
   readonly inbox?: Inbox;
+  readonly board?: Board;
 }
 
 const rpcError = (message: string): object => ({
@@ -46,6 +48,7 @@ const bodyError: ErrorRequestHandler = (error, request, response, next) => {
 
 export function createDepositHttpApp(options: DepositHttpOptions): express.Express {
   const inbox = options.inbox ?? createInbox();
+  const board = options.board ?? createBoard();
   const app = express();
   app.disable("x-powered-by");
   app.use(localhostHostValidation());
@@ -55,7 +58,7 @@ export function createDepositHttpApp(options: DepositHttpOptions): express.Expre
   app.use("/mcp", requireAccess(options.verifyAccess));
   app.use("/mcp", express.json({ limit: "1mb" }));
   app.post("/mcp", async (request, response) => {
-    const server = createDepositServer(inbox);
+    const server = createDepositServer(inbox, board);
     // sessionIdGeneratorを渡さない＝ステートレス（公式の `sessionIdGenerator: undefined` と同じ）
     const transport = new StreamableHTTPServerTransport({});
     try {

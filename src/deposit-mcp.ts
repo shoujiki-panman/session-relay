@@ -1,7 +1,12 @@
-/** スマホ等から会話を預けるだけのMCP。ローカル会話を読む道具は置かない。 */
+/**
+ * スマホ・Dots 等から会話を預ける外向きのMCP。ローカル会話を読む道具は置かない。
+ * 伝言板（エージェント同士が書いて読み合う場所）だけは、外から読み書きできる。
+ */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { type Board, createBoard } from "./board.ts";
+import { addBoardTools } from "./board-tools.ts";
 import { type Inbox, createInbox } from "./inbox.ts";
 
 interface ToolResult {
@@ -19,7 +24,7 @@ const reply = (text: string, ok = true): ToolResult => ({
 const errorText = (error: unknown): string =>
   error instanceof Error && !("code" in error) ? error.message : "保存に失敗しました";
 
-export function createDepositServer(inbox: Inbox = createInbox()): McpServer {
+export function createDepositServer(inbox: Inbox = createInbox(), board: Board = createBoard()): McpServer {
   const server = new McpServer({ name: "relay-deposit", version: "0.2.5" });
   server.registerTool(
     "deposit_conversation",
@@ -47,6 +52,7 @@ export function createDepositServer(inbox: Inbox = createInbox()): McpServer {
       }
     },
   );
+  addBoardTools(server, board);
   return server;
 }
 

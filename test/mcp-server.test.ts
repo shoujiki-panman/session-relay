@@ -25,7 +25,7 @@ afterAll(async () => {
   await client.close();
 });
 
-it("stdioで繋がって、通常の会話と預けた会話を読む6つの道具が見える", async () => {
+it("stdioで繋がって、通常の会話・預けた会話・伝言板・最近の動きの8つの道具が見える", async () => {
   const { tools } = await client.listTools();
   expect(tools.map((tool) => tool.name).sort()).toEqual([
     "get_context",
@@ -34,6 +34,8 @@ it("stdioで繋がって、通常の会話と預けた会話を読む6つの道�
     "list_deposits",
     "list_projects",
     "list_recent_activity",
+    "post_message",
+    "read_messages",
   ]);
 });
 
