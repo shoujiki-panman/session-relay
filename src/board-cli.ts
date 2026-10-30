@@ -47,6 +47,21 @@ function parse(args: readonly string[]): { flags: Map<string, string>; words: st
   return { flags, words };
 }
 
+/**
+ * 失敗の理由を、パスを出さずに伝える。
+ * Dots が Mac で打ったとき「保存に失敗しました」としか出ず、理由が分からなかった（2026-10-31）。
+ * 書き込みを止められたとき（サンドボックスなど）は、そうと分かる言葉にする。
+ */
+export function failureText(error: unknown): string {
+  if (!(error instanceof Error)) return "保存に失敗しました";
+  if (!("code" in error)) return error.message;
+  const code = String(error.code);
+  if (code === "EPERM" || code === "EACCES" || code === "EROFS") {
+    return `保存先に書き込めませんでした（${code}）。この場所への書き込みを止められています。サンドボックスの中で動いているなら、伝言板の場所（~/.local/share/session-relay/board）への書き込みを許してから、もう一度打ってください`;
+  }
+  return `保存に失敗しました（${code}）`;
+}
+
 function post(board: Board, flags: Map<string, string>, words: readonly string[], io: Io): number {
   const from = flags.get("--from");
   const text = words.join(" ");
@@ -60,7 +75,7 @@ function post(board: Board, flags: Map<string, string>, words: readonly string[]
     io.out(`伝言板に書きました（${saved.createdAt} / ${saved.from} → ${saved.to}）\n`);
     return 0;
   } catch (error) {
-    io.err(`書けませんでした: ${error instanceof Error && !("code" in error) ? error.message : "保存に失敗しました"}\n`);
+    io.err(`書けませんでした: ${failureText(error)}\n`);
     return 1;
   }
 }

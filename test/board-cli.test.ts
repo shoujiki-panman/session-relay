@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { createBoard } from "../src/board.ts";
-import { BOARD_USAGE, runBoard } from "../src/board-cli.ts";
+import { BOARD_USAGE, failureText, runBoard } from "../src/board-cli.ts";
 
 const temps: string[] = [];
 afterAll(() => {
@@ -89,4 +89,23 @@ describe("relay board を入口（bin/relay.js）から呼ぶ", () => {
     expect(read.status).toBe(0);
     expect(read.stdout).toContain("ちゃま → all | 入口から");
   }, 20_000);
+});
+
+describe("書けなかったときの理由", () => {
+  const withCode = (code: string): Error => Object.assign(new Error(`${code}: /Users/someone/.local/share/x`), { code });
+
+  it.each(["EPERM", "EACCES", "EROFS"])("%s は、書き込みを止められたと分かる言葉にし、パスは出さない", (code) => {
+    const text = failureText(withCode(code));
+    expect(text).toContain(`（${code}）`);
+    expect(text).toContain("書き込みを止められています");
+    expect(text).not.toContain("/Users/someone");
+  });
+
+  it("ほかのファイルの失敗は、コードだけ添える", () => {
+    expect(failureText(withCode("ENOSPC"))).toBe("保存に失敗しました（ENOSPC）");
+  });
+
+  it("自分で投げた検証のエラーは、そのまま出す", () => {
+    expect(failureText(new Error("伝言が空です"))).toBe("伝言が空です");
+  });
 });
