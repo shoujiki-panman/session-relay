@@ -1,7 +1,7 @@
 {
   "name": "session-relay",
   "displayName": "session-relay",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Pick up where your last AI coding session left off, without writing a handoff note. Reads the conversation you actually had, word for word.",
   "author": {
     "name": "shoujiki-panman",
@@ -9,12 +9,23 @@
   },
   "homepage": "https://github.com/shoujiki-panman/session-relay",
   "repository": "https://github.com/shoujiki-panman/session-relay",
+  "privacyPolicyUrl": "https://github.com/shoujiki-panman/session-relay/blob/main/PRIVACY.md",
   "license": "MIT",
-  "keywords": ["handoff", "context", "session", "resume", "codex"],
+  "keywords": [
+    "handoff",
+    "context",
+    "session",
+    "resume",
+    "codex"
+  ],
   "mcpServers": {
     "relay": {
       "command": "npx",
-      "args": ["-y", "@shoujiki-panman/session-relay@0.4.1", "mcp"]
+      "args": [
+        "-y",
+        "@shoujiki-panman/session-relay@0.4.2",
+        "mcp"
+      ]
     }
   }
 }

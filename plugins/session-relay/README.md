@@ -21,6 +21,10 @@ When you start a new session and say "continue from where we left off", this plu
 
 The optional extras in the full package (a `/clear` hook, a deposit box you can reach from your phone through your own Cloudflare Tunnel, and a "good time to clear" hint that asks TypeSafe) are **not** part of this plugin. They are set up separately, by hand, as the repository README explains.
 
+## Privacy
+
+The plugin sends nothing anywhere and the author receives no data. The full [privacy policy](https://github.com/shoujiki-panman/session-relay/blob/main/PRIVACY.md) lists everything it reads and stores.
+
 ## Requirements
 
 Node.js 20 or later.

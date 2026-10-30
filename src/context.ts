@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { type SessionRecord, extractSession, humanUtterances } from "./extract.ts";
 import { CONTINUATION_INDENT } from "./relay-block.ts";
+import { redactSecrets } from "./redact.ts";
 import type { RepoSignals } from "./repo.ts";
 
 /**
@@ -76,7 +77,7 @@ export function buildContextFrom(
 function render(record: SessionRecord, repo: RepoSignals | undefined, note?: string): string {
   const human = humanUtterances(record);
   const recent = record.turnEndings.slice(-RECENT_TURNS);
-  return [
+  const lines = [
     "# 前の会話の記録（要約なし・本人の発話は原文のまま）",
     "これは同じ人物の直前までの会話です。話が途切れないように、ここから続けてください。",
     ...(note === undefined ? [] : [note]),
@@ -100,5 +101,6 @@ function render(record: SessionRecord, repo: RepoSignals | undefined, note?: str
     "",
     "---",
     "上を読んだうえで、まず一言だけ現在地を確認してから続けてください。",
-  ].join("\n");
+  ];
+  return redactSecrets(lines.join("\n"));
 }

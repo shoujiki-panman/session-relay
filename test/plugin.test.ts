@@ -40,6 +40,11 @@ describe("プラグインの形", () => {
       .filter((entry) => entry.isFile())
       .map((entry) => join(entry.parentPath, entry.name).slice(PLUGIN.length + 1))
       .sort();
-    expect(files).toEqual([".claude-plugin/plugin.json", "README.md", "skills/relay/SKILL.md"]);
+    expect(files).toEqual([
+      ".claude-plugin/icon.png",
+      ".claude-plugin/plugin.json",
+      "README.md",
+      "skills/relay/SKILL.md",
+    ]);
   });
 });
