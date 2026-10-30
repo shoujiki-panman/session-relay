@@ -10,6 +10,8 @@
 
 ## 0.4.2 - 2026-10-30
 
+- `relay mcp-deposit-alexa`: Alexa+（米国・英語）から会話を預ける入口。Claude用とは別ポート（8789）・別ホスト名で動かし、Amazon Cognitoのアクセストークンで守る（署名・発行元・token_use・client_id・scope・本人のsubまで検証）。未認証は401で `WWW-Authenticate` を付けない（Alexa+の決まり）。OAuthのメタデータを `/.well-known/` に置く。手順は `docs/alexa-plus-ja.md`
+- 預けた会話の出典に `alexa` を追加。預ける道具の説明文と返事を入口ごとに差し替えられるようにした（Alexa+向けは英語）
 - 渡す文脈と預けた会話から、鍵やトークンの形をした文字列を伏せるようにした（`[伏せた: 種類]`）。Anthropic・OpenAI・GitHub・npm・AWS・Google・Slack・Stripeの鍵、JWT、Bearerトークン、秘密鍵。形で分かるものだけで、言葉からの推測はしない。手元の記録は書き換えない。手元の記録116本に当てると、伏せたのは本物のJWT 2件だけだった
 - Claude Codeのプラグインとして入れられるようにした（`plugins/session-relay`：「続きから」スキルとMCP。MCPは `npx` でnpmの同じ版に固定して起動する）。Anthropicのプラグイン一覧（Anthropic Directory）に出すための形
 
