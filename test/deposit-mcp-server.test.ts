@@ -12,7 +12,11 @@ const root = mkdtempSync(join(tmpdir(), "session-relay-deposit-mcp-"));
 const inboxDir = join(root, "inbox");
 const client = new Client({ name: "deposit-test", version: "0" });
 const reader = new Client({ name: "reader-test", version: "0" });
-const childEnvironment = { ...getDefaultEnvironment(), SESSION_RELAY_INBOX_DIR: inboxDir };
+const childEnvironment = {
+  ...getDefaultEnvironment(),
+  SESSION_RELAY_INBOX_DIR: inboxDir,
+  SESSION_RELAY_BOARD_DIR: join(root, "board"),
+};
 
 beforeAll(async () => {
   await client.connect(
@@ -39,9 +43,30 @@ afterAll(async () => {
   rmSync(root, { recursive: true, force: true });
 });
 
-it("外向きMCPには預ける道具しか見えない", async () => {
+it("外向きMCPには、預ける道具と伝言板しか見えない（手元の会話を読む道具は出さない）", async () => {
   const { tools } = await client.listTools();
-  expect(tools.map((tool) => tool.name)).toEqual(["deposit_conversation"]);
+  expect(tools.map((tool) => tool.name).sort()).toEqual(["deposit_conversation", "post_message", "read_messages"]);
+});
+
+const textOf = (result: unknown): string =>
+  z.object({ content: z.array(z.object({ text: z.string() })) }).parse(result).content.map((c) => c.text).join("\n");
+
+it("外（Dots など）が書いた伝言を、手元（Claude Code）が読み、返事を外が読める", async () => {
+  const since = new Date(Date.now() - 1000).toISOString();
+  await client.callTool({
+    name: "post_message",
+    arguments: { from: "ちゃま", to: "Claude Code", text: "動画の続きをお願い" },
+  });
+  const inbox = textOf(await reader.callTool({ name: "read_messages", arguments: { since, to: "Claude Code" } }));
+  expect(inbox).toContain("ちゃま → Claude Code | 動画の続きをお願い");
+
+  await reader.callTool({
+    name: "post_message",
+    arguments: { from: "Claude Code", to: "ちゃま", text: "できました" },
+  });
+  const back = textOf(await client.callTool({ name: "read_messages", arguments: { since, to: "ちゃま" } }));
+  expect(back).toContain("Claude Code → ちゃま | できました");
+  expect(back).not.toContain("動画の続きをお願い");
 });
 
 it("MCP越しに預けた本人の原文をMac側で読める", async () => {
