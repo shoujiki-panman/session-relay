@@ -22,7 +22,7 @@ export const USAGE = `会話を別スレッド／別ハーネスへ渡す
   relay --list --all         他のプロジェクトの会話も見る
   relay --from <#|ref>       一覧から1本を選んで渡す（refはどれだけ古くても当たる）
   relay --pick [検索語]      その場で選ぶ（↑↓ / 打つと絞る / Enter / Esc）
-  relay --page [出力先]      一覧を1枚のHTMLにしてブラウザで開く（道具を選ばない）
+  relay --page [出力先]      一覧を1枚のHTMLにしてブラウザで開く（預かった会話も並べる）
   relay --canvas [出力先]    プロジェクトと会話を .canvas に書き出す
   relay --records <場所>     一覧を1会話＝1ファイルで書き出す（画面から選ぶ用）
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Listed } from "../src/list.ts";
-import { buildPage, toPageRows } from "../src/page.ts";
+import type { Deposit } from "../src/inbox.ts";
+import { DEPOSITS_HEADING, buildPage, depositRows, toPageRows } from "../src/page.ts";
 import type { Project } from "../src/projects.ts";
 import { unknownArg } from "../src/usage.ts";
 
@@ -83,5 +84,61 @@ describe("1枚のHTMLにする", () => {
     // `--lst` が会話を起動した件と同じ穴。足したフラグを登録し忘れると落ちる
     expect(unknownArg(["--page"])).toBeNull();
     expect(unknownArg(["--page", "/tmp/a.html"])).toBeNull();
+  });
+});
+
+describe("預かった会話も同じ一覧に並べる", () => {
+  const deposit = (over: Partial<Deposit> = {}): Deposit => ({
+    shape: 1,
+    id: "7d96d293-975a-48b9-8648-4b971db826d8",
+    createdAt: "2026-10-16T15:31:21.929Z",
+    title: "ちゃまからの試し",
+    source: "other",
+    userMessages: ["この会話を預けて", "非公開URLは入れなくていいよ"],
+    progress: ["預けました"],
+    ...over,
+  });
+
+  it("見出し・出どころ・発話の数だけを載せ、預かった中身は入れない", () => {
+    const [row] = depositRows([deposit()]);
+    expect(row).toMatchObject({
+      ref: "7d96d293",
+      project: DEPOSITS_HEADING,
+      topic: "ちゃまからの試し",
+      harness: "ほかのAI",
+      utterances: 2,
+      kind: "deposit",
+    });
+    expect(JSON.stringify(row)).not.toContain("非公開URL");
+  });
+
+  it("出どころを人の言葉で書く", () => {
+    const labels = depositRows([
+      deposit({ source: "claude-mobile" }),
+      deposit({ source: "claude-web" }),
+      deposit({ source: "other" }),
+    ]).map((row) => row.harness);
+    expect(labels).toEqual(["スマホのClaude", "WebのClaude", "ほかのAI"]);
+  });
+
+  it("預かった会話を、手元の会話より先に並べる", () => {
+    const html = buildPage([project("relay", [session()])], [deposit()]);
+    const rows = rowsIn(html);
+    expect(Array.isArray(rows) ? rows.map((r: { project: string }) => r.project) : []).toEqual([
+      DEPOSITS_HEADING,
+      "relay",
+    ]);
+  });
+
+  it("預かった会話の「続きから」は get_deposit、「端末から」は relay deposits show を使う", () => {
+    const html = buildPage([], [deposit()]);
+    expect(html).toContain('row.kind === "deposit"');
+    expect(html).toContain("get_deposit を ref");
+    expect(html).toContain('"relay deposits show "');
+  });
+
+  it("預かった会話が無ければ、今までと同じ一覧になる", () => {
+    const projects = [project("relay", [session()])];
+    expect(buildPage(projects, [])).toBe(buildPage(projects));
   });
 });

@@ -10,9 +10,13 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { toCanvas } from "./canvas.ts";
+import { createInbox } from "./inbox.ts";
 import { buildPage } from "./page.ts";
 import { projectsOf } from "./query.ts";
 import { toRecords, writeRecords } from "./records.ts";
+
+/** 一覧ページに並べる預かった会話の数。新しい順 */
+const DEPOSITS_ON_PAGE = 20;
 
 const nothingFound = (): number => {
   process.stderr.write("会話の記録が見つかりませんでした\n");
@@ -40,10 +44,11 @@ export function page(given: string | null, limit: number): number {
   if (projects.length === 0) return nothingFound();
   const outPath = given ?? defaultPagePath();
   mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(outPath, buildPage(projects), "utf8");
+  const deposits = createInbox().list().slice(0, DEPOSITS_ON_PAGE);
+  writeFileSync(outPath, buildPage(projects, deposits), "utf8");
   const sessions = projects.reduce((total, row) => total + row.sessions.length, 0);
   process.stderr.write(
-    `${outPath} に書き出しました（プロジェクト ${String(projects.length)} / 会話 ${String(sessions)}）\n`,
+    `${outPath} に書き出しました（プロジェクト ${String(projects.length)} / 会話 ${String(sessions)} / 預かった会話 ${String(deposits.length)}）\n`,
   );
   const how = opener();
   if (how === null) return 0;

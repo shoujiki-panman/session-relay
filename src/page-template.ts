@@ -89,6 +89,11 @@ function copy(text, told) {
 }
 
 function instruction(row) {
+  if (row.kind === "deposit") {
+    return "「" + row.topic + "」の続きから。\\n\\n" +
+      "relay の get_deposit を ref " + row.ref + " で呼んで預けた会話を読み込み、\\n" +
+      "どこまで進んでいたかを一言で確認してから続けてください。";
+  }
   return "「" + row.topic + "」の続きから。\\n\\n" +
     "relay の get_context を ref " + row.ref + " で呼んで前の会話を読み込み、\\n" +
     "どこまで進んでいたかを一言で確認してから続けてください。";
@@ -118,7 +123,8 @@ function rowEl(row) {
   var term = document.createElement("button");
   term.className = "term";
   term.textContent = "端末から";
-  term.onclick = function () { copy("relay --from " + row.ref, "端末に貼る一行をコピーしました"); };
+  var line = row.kind === "deposit" ? "relay deposits show " + row.ref : "relay --from " + row.ref;
+  term.onclick = function () { copy(line, "端末に貼る一行をコピーしました"); };
   var main = document.createElement("button");
   main.textContent = "続きから";
   main.onclick = function () { copy(instruction(row), "コピーしました。AIに貼ってください"); };
